@@ -176,10 +176,14 @@ def renderizar_pagina_procedimentos(conn):
     """
     st.subheader("🔬 Gerenciamento de Procedimentos")
     
+    st.info("""
+    ℹ️ **Cadastro de procedimentos:** Todos os procedimentos devem ser validados no Oracle Lake.
+    Use a busca por código ou por termo para encontrar e cadastrar procedimentos.
+    """)
+    
     # Tabs para organizar funcionalidades
-    tab_listar, tab_manual, tab_busca_codigo, tab_busca_termo = st.tabs([
+    tab_listar, tab_busca_codigo, tab_busca_termo = st.tabs([
         "📋 Listar",
-        "✍️ Manual",
         "🔍 Buscar por Código",
         "🔎 Buscar por Termo"
     ])
@@ -256,69 +260,6 @@ def renderizar_pagina_procedimentos(conn):
                             if st.button("✅ Ativar", key=f"activate_proc_{row['cd_procedimento']}"):
                                 alternar_status_procedimento(conn, row['cd_procedimento'], True)
                                 st.rerun()
-    
-    # ===== TAB: MANUAL =====
-    with tab_manual:
-        st.markdown("### Adicionar Procedimento Manualmente")
-        
-        with st.form("form_procedimento_manual"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                cd_procedimento = st.number_input(
-                    "Código do Procedimento:",
-                    min_value=1,
-                    step=1,
-                    help="CD_PROCEDIMENTO"
-                )
-            
-            with col2:
-                df_modalidades = obter_modalidades_ativas(conn)
-                if len(df_modalidades) == 0:
-                    st.error("❌ Nenhuma modalidade cadastrada. Cadastre modalidades primeiro.")
-                    st.stop()
-                
-                modalidade_selecionada = st.selectbox(
-                    "Modalidade:",
-                    options=df_modalidades['nome_modalidade'].tolist()
-                )
-            
-            nm_procedimento = st.text_input(
-                "Nome do Procedimento:",
-                placeholder="Ex: TOMOGRAFIA COMPUTADORIZADA DE ABDOME"
-            )
-            
-            # Multiselect para descrições
-            df_descricoes = obter_descricoes_ativas(conn)
-            if len(df_descricoes) == 0:
-                st.warning("⚠️ Nenhuma descrição cadastrada. Cadastre descrições primeiro.")
-            else:
-                descricoes_selecionadas = st.multiselect(
-                    "Descrições (selecione até 7):",
-                    options=df_descricoes['descricao'].tolist(),
-                    max_selections=7,
-                    help="Selecione as descrições que se aplicam a este procedimento"
-                )
-            
-            submitted = st.form_submit_button("➕ Adicionar Procedimento")
-            
-            if submitted:
-                if cd_procedimento and nm_procedimento.strip():
-                    id_modalidade = df_modalidades[
-                        df_modalidades['nome_modalidade'] == modalidade_selecionada
-                    ]['id_modalidade'].iloc[0]
-                    
-                    # Converter descrições selecionadas para IDs
-                    ids_descricoes = []
-                    if len(df_descricoes) > 0 and 'descricoes_selecionadas' in locals():
-                        for desc in descricoes_selecionadas:
-                            id_desc = df_descricoes[df_descricoes['descricao'] == desc]['id_descricao'].iloc[0]
-                            ids_descricoes.append(id_desc)
-                    
-                    if adicionar_procedimento(conn, cd_procedimento, nm_procedimento.strip(), id_modalidade, ids_descricoes):
-                        st.rerun()
-                else:
-                    st.error("❌ Código e Nome do procedimento são obrigatórios")
     
     # ===== TAB: BUSCA POR CÓDIGO =====
     with tab_busca_codigo:
