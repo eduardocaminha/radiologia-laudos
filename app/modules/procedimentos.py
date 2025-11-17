@@ -110,12 +110,14 @@ def adicionar_procedimento(conn, cd_procedimento, nm_procedimento, id_modalidade
     INSERT INTO {TABLE_PROCEDIMENTOS} (
         cd_procedimento, nm_procedimento, id_modalidade,
         descricao_1, descricao_2, descricao_3, descricao_4,
-        descricao_5, descricao_6, descricao_7, ativo
+        descricao_5, descricao_6, descricao_7, ativo,
+        dt_cadastro, dt_atualizacao
     )
     VALUES (
         {cd_procedimento}, '{nm_procedimento}', {id_modalidade},
         {desc_values[0]}, {desc_values[1]}, {desc_values[2]}, {desc_values[3]},
-        {desc_values[4]}, {desc_values[5]}, {desc_values[6]}, TRUE
+        {desc_values[4]}, {desc_values[5]}, {desc_values[6]}, TRUE,
+        CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
     )
     """
     

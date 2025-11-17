@@ -59,8 +59,8 @@ def adicionar_descricao(conn, descricao):
     
     # Inserir
     command = f"""
-    INSERT INTO {TABLE_DESCRICOES} (descricao, ativo)
-    VALUES ('{descricao}', TRUE)
+    INSERT INTO {TABLE_DESCRICOES} (descricao, ativo, dt_cadastro, dt_atualizacao)
+    VALUES ('{descricao}', TRUE, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())
     """
     
     if execute_command(conn, command):

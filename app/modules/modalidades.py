@@ -59,8 +59,8 @@ def adicionar_modalidade(conn, nome_modalidade):
     
     # Inserir
     command = f"""
-    INSERT INTO {TABLE_MODALIDADES} (nome_modalidade, ativo)
-    VALUES ('{nome_modalidade}', TRUE)
+    INSERT INTO {TABLE_MODALIDADES} (nome_modalidade, ativo, dt_cadastro, dt_atualizacao)
+    VALUES ('{nome_modalidade}', TRUE, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())
     """
     
     if execute_command(conn, command):
