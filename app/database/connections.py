@@ -7,9 +7,23 @@ import pandas as pd
 from databricks import sql
 from databricks.sdk.core import Config
 from config import ORACLE_TABLE_PROCEDIMENTO_HSP, MAX_RESULTADOS_BUSCA
+import os
 
 # Configuração Databricks
 cfg = Config()
+
+# Verificar se estamos no ambiente Databricks
+IS_DATABRICKS = os.path.exists('/Workspace')
+
+# Importar run_sql se disponível (ambiente Databricks)
+if IS_DATABRICKS:
+    try:
+        # No Databricks, a função run_sql é injetada pelo ambiente
+        # após executar %run /Workspace/Libraries/Lake
+        from pyspark.sql import SparkSession
+        spark = SparkSession.builder.getOrCreate()
+    except:
+        pass
 
 @st.cache_resource
 def get_databricks_connection(http_path):
@@ -52,7 +66,7 @@ def buscar_procedimento_oracle(cd_procedimento=None, termo_busca=None):
     """
     Busca procedimentos no Oracle Lake (RAWZN.RAW_HSP_TB_PROCEDIMENTO)
     
-    NOTA: Esta função só funciona dentro do Databricks workspace com acesso ao run_sql.
+    NOTA: Esta função só funciona dentro do Databricks workspace com Spark SQL.
     No ambiente local, retorna dados mockados para desenvolvimento.
     
     Args:
@@ -64,7 +78,7 @@ def buscar_procedimento_oracle(cd_procedimento=None, termo_busca=None):
     """
     try:
         # Verificar se estamos no ambiente Databricks
-        if 'run_sql' in globals():
+        if IS_DATABRICKS and 'spark' in globals():
             if cd_procedimento:
                 query = f"""
                 SELECT DISTINCT CD_PROCEDIMENTO, NM_PROCEDIMENTO
@@ -77,17 +91,18 @@ def buscar_procedimento_oracle(cd_procedimento=None, termo_busca=None):
                 FROM {ORACLE_TABLE_PROCEDIMENTO_HSP}
                 WHERE UPPER(NM_PROCEDIMENTO) LIKE UPPER('%{termo_busca}%')
                 ORDER BY NM_PROCEDIMENTO
-                FETCH FIRST {MAX_RESULTADOS_BUSCA} ROWS ONLY
+                LIMIT {MAX_RESULTADOS_BUSCA}
                 """
             else:
                 return pd.DataFrame()
             
-            # Executar via run_sql (função do Lake)
-            df = run_sql(query)
+            # Executar via Spark SQL e converter para Pandas
+            spark_df = spark.sql(query)
+            df = spark_df.toPandas()
             return df
         else:
             # Ambiente local - retornar mock para desenvolvimento
-            st.warning("⚠️ Função run_sql não disponível (ambiente local). Usando dados mockados.")
+            st.warning("⚠️ Ambiente local detectado. Usando dados mockados para Oracle Lake.")
             if cd_procedimento:
                 return pd.DataFrame({
                     'CD_PROCEDIMENTO': [cd_procedimento],
