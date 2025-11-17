@@ -1,12 +1,13 @@
-[theme]
-# Cores baseadas no arquivo colors.json
-primaryColor = "#0B5FFF"           # Azul principal
-backgroundColor = "#FFFFFF"         # Branco para fundo
-secondaryBackgroundColor = "#F1F2F5" # Cinza claro para elementos secundários
-textColor = "#272833"              # Cinza escuro para texto principal
-
-# Fontes
-font = "sans serif"  # Streamlit não suporta fontes customizadas diretamente no config.toml
+# Tema desabilitado temporariamente para testes
+# [theme]
+# # Cores baseadas no arquivo colors.json
+# primaryColor = "#0B5FFF"           # Azul principal
+# backgroundColor = "#FFFFFF"         # Branco para fundo
+# secondaryBackgroundColor = "#F1F2F5" # Cinza claro para elementos secundários
+# textColor = "#272833"              # Cinza escuro para texto principal
+# 
+# # Fontes
+# font = "sans serif"  # Streamlit não suporta fontes customizadas diretamente no config.toml
 
 [browser]
 gatherUsageStats = false
