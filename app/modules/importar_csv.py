@@ -181,11 +181,13 @@ def importar_procedimentos(conn, df, modalidades_selecionadas=None):
         modalidades_selecionadas: Lista de modalidades para filtrar (None = todas)
         
     Returns:
-        Tupla (sucesso, erros, duplicados)
+        Tupla (sucesso, erros, duplicados, detalhes)
     """
     sucesso = 0
     erros = 0
     duplicados = 0
+    erros_modalidade = 0
+    erros_insercao = 0
     
     # Filtrar por modalidades se especificado
     if modalidades_selecionadas:
@@ -212,6 +214,7 @@ def importar_procedimentos(conn, df, modalidades_selecionadas=None):
         id_modalidade = obter_id_modalidade(conn, modalidade)
         if not id_modalidade:
             erros += 1
+            erros_modalidade += 1
             continue
         
         # Preparar IDs de descrições
@@ -248,8 +251,14 @@ def importar_procedimentos(conn, df, modalidades_selecionadas=None):
             sucesso += 1
         else:
             erros += 1
+            erros_insercao += 1
     
-    return sucesso, erros, duplicados
+    detalhes = {
+        'erros_modalidade': erros_modalidade,
+        'erros_insercao': erros_insercao
+    }
+    
+    return sucesso, erros, duplicados, detalhes
 
 
 def renderizar_pagina_importar_csv(conn):
@@ -427,16 +436,19 @@ def renderizar_pagina_importar_csv(conn):
         
         if st.button("➕ Importar Procedimentos", key="btn_importar_procedimentos"):
             with st.spinner("Importando procedimentos..."):
-                sucesso, erros, duplicados = importar_procedimentos(conn, df, modalidades_importar)
+                sucesso, erros, duplicados, detalhes = importar_procedimentos(conn, df, modalidades_importar)
             
             st.markdown("**Resultado da importação:**")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("✅ Sucesso", sucesso)
+                st.metric("✅ Importados", sucesso)
             with col2:
                 st.metric("❌ Erros", erros)
+                if erros > 0:
+                    st.caption(f"Modalidade não encontrada: {detalhes['erros_modalidade']}")
+                    st.caption(f"Erro na inserção: {detalhes['erros_insercao']}")
             with col3:
-                st.metric("🔄 Duplicados", duplicados)
+                st.metric("⚠️ Duplicados", duplicados)
             
             if sucesso > 0:
                 st.success(f"✅ Importação concluída! {sucesso} procedimento(s) adicionado(s).")
@@ -468,7 +480,7 @@ def renderizar_pagina_importar_csv(conn):
             
             # Procedimentos
             st.info("Importando procedimentos...")
-            suc_proc, err_proc, dup_proc = importar_procedimentos(conn, df)
+            suc_proc, err_proc, dup_proc, det_proc = importar_procedimentos(conn, df)
         
         st.markdown("### 📊 Resultado Final")
         
@@ -487,6 +499,25 @@ def renderizar_pagina_importar_csv(conn):
             st.markdown("**Procedimentos:**")
             st.metric("Importados", suc_proc)
             st.metric("Erros", err_proc)
+            if err_proc > 0:
+                st.caption(f"Modalidade não encontrada: {det_proc['erros_modalidade']}")
+                st.caption(f"Erro na inserção: {det_proc['erros_insercao']}")
             st.metric("Duplicados", dup_proc)
+            
+        # Mostrar resumo detalhado
+        st.markdown("---")
+        st.markdown("### 📋 Resumo da Importação")
+        total_csv = len(df)
+        total_importado = suc_proc
+        total_nao_importado = err_proc + dup_proc
+        
+        st.info(f"""
+        **CSV:** {total_csv} procedimentos  
+        **Importados:** {total_importado}  
+        **Não importados:** {total_nao_importado}
+        - Duplicados (já existiam): {dup_proc}
+        - Erros de modalidade: {det_proc['erros_modalidade']}
+        - Erros de inserção: {det_proc['erros_insercao']}
+        """)
         
         st.success("✅ Importação completa finalizada!")
