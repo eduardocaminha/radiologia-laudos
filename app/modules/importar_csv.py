@@ -271,6 +271,49 @@ def renderizar_pagina_importar_csv(conn):
     4. Importar procedimentos (vinculando modalidades e descrições)
     """)
     
+    # ===== ESTATÍSTICAS ATUAIS =====
+    st.markdown("---")
+    st.markdown("### 📈 Dados Atuais no Banco")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        query_mod = f"SELECT COUNT(*) as total FROM {TABLE_MODALIDADES}"
+        df_mod = execute_query(conn, query_mod)
+        total_mod = df_mod['total'].iloc[0] if len(df_mod) > 0 else 0
+        st.metric("🏷️ Modalidades", total_mod)
+    
+    with col2:
+        query_desc = f"SELECT COUNT(*) as total FROM {TABLE_DESCRICOES}"
+        df_desc = execute_query(conn, query_desc)
+        total_desc = df_desc['total'].iloc[0] if len(df_desc) > 0 else 0
+        st.metric("📝 Descrições", total_desc)
+    
+    with col3:
+        query_proc = f"SELECT COUNT(*) as total FROM {TABLE_PROCEDIMENTOS}"
+        df_proc = execute_query(conn, query_proc)
+        total_proc = df_proc['total'].iloc[0] if len(df_proc) > 0 else 0
+        st.metric("🔬 Procedimentos", total_proc)
+    
+    # Mostrar procedimentos com nomes duplicados
+    if total_proc > 0:
+        with st.expander("🔍 Ver procedimentos com nomes repetidos (códigos diferentes)"):
+            query_duplicados = f"""
+            SELECT nm_procedimento, COUNT(*) as qtd, 
+                   COLLECT_LIST(cd_procedimento) as codigos
+            FROM {TABLE_PROCEDIMENTOS}
+            GROUP BY nm_procedimento
+            HAVING COUNT(*) > 1
+            ORDER BY qtd DESC
+            """
+            df_dup = execute_query(conn, query_duplicados)
+            
+            if len(df_dup) > 0:
+                st.info(f"📊 {len(df_dup)} nomes de procedimentos aparecem com códigos diferentes")
+                st.dataframe(df_dup, use_container_width=True)
+            else:
+                st.success("✅ Não há nomes de procedimentos duplicados")
+    
     st.markdown("---")
     
     # ===== CARREGAR CSV =====
