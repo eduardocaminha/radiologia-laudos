@@ -120,6 +120,47 @@ def alternar_status_descricao(conn, id_descricao, ativo):
     return False
 
 
+def deletar_descricao(conn, id_descricao):
+    """
+    Deleta uma descrição (apenas se não estiver sendo usada em procedimentos)
+    
+    Args:
+        conn: Conexão com Databricks
+        id_descricao: ID da descrição
+        
+    Returns:
+        True se sucesso, False se erro
+    """
+    # Verificar se está sendo usada em procedimentos
+    query_check = f"""
+    SELECT COUNT(*) as total
+    FROM {TABLE_PROCEDIMENTOS}
+    WHERE id_descricao_1 = {id_descricao}
+       OR id_descricao_2 = {id_descricao}
+       OR id_descricao_3 = {id_descricao}
+       OR id_descricao_4 = {id_descricao}
+       OR id_descricao_5 = {id_descricao}
+       OR id_descricao_6 = {id_descricao}
+       OR id_descricao_7 = {id_descricao}
+    """
+    df_check = execute_query(conn, query_check)
+    
+    if len(df_check) > 0 and df_check['total'].iloc[0] > 0:
+        st.error(f"❌ Esta descrição está sendo usada em {df_check['total'].iloc[0]} procedimento(s). Use a função 'Mesclar' para substituí-la primeiro.")
+        return False
+    
+    # Deletar
+    command = f"""
+    DELETE FROM {TABLE_DESCRICOES}
+    WHERE id_descricao = {id_descricao}
+    """
+    
+    if execute_command(conn, command):
+        st.success("✅ Descrição deletada com sucesso!")
+        return True
+    return False
+
+
 def substituir_descricao_em_procedimentos(conn, id_origem, id_destino):
     """
     Substitui todas as ocorrências de uma descrição por outra nos procedimentos
@@ -240,7 +281,7 @@ def renderizar_pagina_descricoes(conn):
                             height=100
                         )
                         
-                        col_save, col_cancel = st.columns(2)
+                        col_save, col_cancel, col_delete = st.columns(3)
                         with col_save:
                             if st.form_submit_button("💾 Salvar"):
                                 if nova_descricao.strip():
@@ -254,6 +295,12 @@ def renderizar_pagina_descricoes(conn):
                             if st.form_submit_button("❌ Cancelar"):
                                 st.session_state[f"editing_desc_{row['id_descricao']}"] = False
                                 st.rerun()
+                        
+                        with col_delete:
+                            if st.form_submit_button("🗑️ Deletar", type="secondary"):
+                                if deletar_descricao(conn, row['id_descricao']):
+                                    st.session_state[f"editing_desc_{row['id_descricao']}"] = False
+                                    st.rerun()
                 
                 st.markdown("---")
     
