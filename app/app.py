@@ -69,6 +69,17 @@ st.markdown("""
     [data-baseweb="select"] > div {
         min-height: 2.5rem;
     }
+    
+    /* Corrigir expander */
+    .streamlit-expanderHeader {
+        font-size: 1rem !important;
+        padding: 0.5rem 1rem !important;
+    }
+    
+    details summary {
+        cursor: pointer;
+        padding: 0.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
