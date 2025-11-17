@@ -28,6 +28,33 @@ st.set_page_config(
     layout="wide"
 )
 
+# Aplicar CSS customizado para fontes
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Oxygen:wght@300;400;700&display=swap');
+    
+    @font-face {
+        font-family: 'Pitanga';
+        src: url('./assets/Pitanga-Regular.ttf') format('truetype');
+    }
+    
+    /* Fonte para títulos (h1, h2, h3) */
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Pitanga', sans-serif !important;
+    }
+    
+    /* Fonte para corpo do texto */
+    html, body, [class*="css"], p, div, span, label {
+        font-family: 'Oxygen', sans-serif !important;
+    }
+    
+    /* Manter fonte monospace para código */
+    code, pre {
+        font-family: 'Courier New', monospace !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # =====================================================================
 # INTERFACE PRINCIPAL
 # =====================================================================
