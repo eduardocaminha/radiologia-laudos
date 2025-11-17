@@ -117,3 +117,25 @@ def verificar_tabelas_existem(conn):
         return len(df) == 3
     except:
         return False
+
+
+def deletar_tabelas_gold(conn):
+    """
+    Deleta todas as tabelas Gold (usar com cuidado!)
+    
+    Args:
+        conn: Conexão com Databricks SQL Warehouse
+        
+    Returns:
+        True se sucesso, False se erro
+    """
+    try:
+        # Deletar na ordem inversa por causa das Foreign Keys
+        execute_command(conn, f"DROP TABLE IF EXISTS {TABLE_PROCEDIMENTOS}")
+        execute_command(conn, f"DROP TABLE IF EXISTS {TABLE_DESCRICOES}")
+        execute_command(conn, f"DROP TABLE IF EXISTS {TABLE_MODALIDADES}")
+        st.success("✅ Tabelas deletadas com sucesso!")
+        return True
+    except Exception as e:
+        st.error(f"❌ Erro ao deletar tabelas: {str(e)}")
+        return False

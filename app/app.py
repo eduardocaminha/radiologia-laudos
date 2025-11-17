@@ -12,6 +12,7 @@ from database import (
     get_databricks_connection,
     criar_tabelas_gold,
     verificar_tabelas_existem,
+    deletar_tabelas_gold,
     execute_query
 )
 from modules import (
@@ -107,6 +108,22 @@ with st.spinner("Verificando tabelas Gold..."):
             st.stop()
     else:
         st.sidebar.info("✅ Tabelas Gold prontas")
+
+# Botão de reset (apenas para admin/desenvolvimento)
+st.sidebar.markdown("---")
+with st.sidebar.expander("⚙️ Configurações Avançadas"):
+    st.warning("⚠️ **CUIDADO**: Esta ação deleta TODAS as tabelas e dados!")
+    confirmar_reset = st.text_input(
+        "Digite 'DELETAR' para confirmar:",
+        key="confirmar_reset"
+    )
+    if st.button("🗑️ Deletar Tabelas Gold", type="secondary"):
+        if confirmar_reset == "DELETAR":
+            if deletar_tabelas_gold(conn):
+                st.success("✅ Tabelas deletadas! Recarregue a página para recriar.")
+                st.balloons()
+        else:
+            st.error("❌ Confirmação incorreta. Digite 'DELETAR' para confirmar.")
 
 # =====================================================================
 # NAVEGAÇÃO
