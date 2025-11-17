@@ -382,6 +382,30 @@ def renderizar_pagina_importar_csv(conn):
         descricoes_unicas = extrair_descricoes_unicas(df)
         st.metric("Descrições Únicas", len(descricoes_unicas))
     
+    # Análise de duplicados no CSV
+    st.markdown("---")
+    duplicados_csv = df[df.duplicated(subset=['CD_PROCEDIMENTO'], keep=False)]
+    if len(duplicados_csv) > 0:
+        codigos_duplicados = duplicados_csv['CD_PROCEDIMENTO'].unique()
+        st.warning(f"⚠️ **ATENÇÃO: {len(codigos_duplicados)} códigos aparecem duplicados no CSV!**")
+        st.error(f"🔴 Total de {len(duplicados_csv)} linhas duplicadas (apenas a primeira será importada)")
+        
+        with st.expander("🔍 Ver códigos duplicados no CSV"):
+            df_dup_analise = duplicados_csv.groupby('CD_PROCEDIMENTO').agg({
+                'NM_PROCEDIMENTO': 'first',
+                'MODALIDADE': 'first',
+                'CD_PROCEDIMENTO': 'count'
+            }).rename(columns={'CD_PROCEDIMENTO': 'QUANTIDADE'})
+            df_dup_analise = df_dup_analise.sort_values('QUANTIDADE', ascending=False)
+            st.dataframe(df_dup_analise, use_container_width=True)
+            
+            st.info("""
+            **Ação recomendada:** Limpe o CSV removendo as linhas duplicadas.  
+            O sistema só importa a primeira ocorrência de cada código.
+            """)
+    else:
+        st.success("✅ Nenhum código duplicado no CSV")
+    
     # Preview dos dados
     with st.expander("👁️ Visualizar dados do CSV"):
         st.dataframe(df.head(20), use_container_width=True)
