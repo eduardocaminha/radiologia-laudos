@@ -28,7 +28,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Aplicar CSS customizado para fontes
+# Aplicar CSS customizado para fontes e correções visuais
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Oxygen:wght@300;400;700&display=swap');
@@ -51,6 +51,22 @@ st.markdown("""
     /* Manter fonte monospace para código */
     code, pre {
         font-family: 'Courier New', monospace !important;
+    }
+    
+    /* Corrigir sobreposição de texto nos selectbox */
+    [data-baseweb="select"] {
+        margin-top: 0.5rem;
+    }
+    
+    /* Garantir espaçamento adequado nos labels */
+    .stSelectbox > label {
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    /* Ajustar altura dos selectbox */
+    [data-baseweb="select"] > div {
+        min-height: 2.5rem;
     }
 </style>
 """, unsafe_allow_html=True)

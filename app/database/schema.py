@@ -58,17 +58,25 @@ def criar_tabelas_gold(conn):
         cd_procedimento BIGINT NOT NULL,
         nm_procedimento STRING NOT NULL,
         id_modalidade BIGINT NOT NULL,
-        descricao_1 STRING,
-        descricao_2 STRING,
-        descricao_3 STRING,
-        descricao_4 STRING,
-        descricao_5 STRING,
-        descricao_6 STRING,
-        descricao_7 STRING,
+        id_descricao_1 BIGINT,
+        id_descricao_2 BIGINT,
+        id_descricao_3 BIGINT,
+        id_descricao_4 BIGINT,
+        id_descricao_5 BIGINT,
+        id_descricao_6 BIGINT,
+        id_descricao_7 BIGINT,
         ativo BOOLEAN,
         dt_cadastro TIMESTAMP,
         dt_atualizacao TIMESTAMP,
-        CONSTRAINT pk_procedimento PRIMARY KEY (cd_procedimento)
+        CONSTRAINT pk_procedimento PRIMARY KEY (cd_procedimento),
+        CONSTRAINT fk_modalidade FOREIGN KEY (id_modalidade) REFERENCES {TABLE_MODALIDADES}(id_modalidade),
+        CONSTRAINT fk_descricao_1 FOREIGN KEY (id_descricao_1) REFERENCES {TABLE_DESCRICOES}(id_descricao),
+        CONSTRAINT fk_descricao_2 FOREIGN KEY (id_descricao_2) REFERENCES {TABLE_DESCRICOES}(id_descricao),
+        CONSTRAINT fk_descricao_3 FOREIGN KEY (id_descricao_3) REFERENCES {TABLE_DESCRICOES}(id_descricao),
+        CONSTRAINT fk_descricao_4 FOREIGN KEY (id_descricao_4) REFERENCES {TABLE_DESCRICOES}(id_descricao),
+        CONSTRAINT fk_descricao_5 FOREIGN KEY (id_descricao_5) REFERENCES {TABLE_DESCRICOES}(id_descricao),
+        CONSTRAINT fk_descricao_6 FOREIGN KEY (id_descricao_6) REFERENCES {TABLE_DESCRICOES}(id_descricao),
+        CONSTRAINT fk_descricao_7 FOREIGN KEY (id_descricao_7) REFERENCES {TABLE_DESCRICOES}(id_descricao)
     )
     USING DELTA
     TBLPROPERTIES (

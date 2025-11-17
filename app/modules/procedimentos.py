@@ -10,7 +10,7 @@ from database import execute_query, execute_command, buscar_procedimento_oracle
 
 def listar_procedimentos(conn, apenas_ativos=True, id_modalidade=None):
     """
-    Lista todos os procedimentos
+    Lista todos os procedimentos com suas descrições
     
     Args:
         conn: Conexão com Databricks
@@ -34,17 +34,31 @@ def listar_procedimentos(conn, apenas_ativos=True, id_modalidade=None):
         p.nm_procedimento,
         p.id_modalidade,
         m.nome_modalidade,
-        p.descricao_1,
-        p.descricao_2,
-        p.descricao_3,
-        p.descricao_4,
-        p.descricao_5,
-        p.descricao_6,
-        p.descricao_7,
+        p.id_descricao_1,
+        p.id_descricao_2,
+        p.id_descricao_3,
+        p.id_descricao_4,
+        p.id_descricao_5,
+        p.id_descricao_6,
+        p.id_descricao_7,
+        d1.descricao as descricao_1,
+        d2.descricao as descricao_2,
+        d3.descricao as descricao_3,
+        d4.descricao as descricao_4,
+        d5.descricao as descricao_5,
+        d6.descricao as descricao_6,
+        d7.descricao as descricao_7,
         p.ativo,
         p.dt_cadastro
     FROM {TABLE_PROCEDIMENTOS} p
     INNER JOIN {TABLE_MODALIDADES} m ON p.id_modalidade = m.id_modalidade
+    LEFT JOIN {TABLE_DESCRICOES} d1 ON p.id_descricao_1 = d1.id_descricao
+    LEFT JOIN {TABLE_DESCRICOES} d2 ON p.id_descricao_2 = d2.id_descricao
+    LEFT JOIN {TABLE_DESCRICOES} d3 ON p.id_descricao_3 = d3.id_descricao
+    LEFT JOIN {TABLE_DESCRICOES} d4 ON p.id_descricao_4 = d4.id_descricao
+    LEFT JOIN {TABLE_DESCRICOES} d5 ON p.id_descricao_5 = d5.id_descricao
+    LEFT JOIN {TABLE_DESCRICOES} d6 ON p.id_descricao_6 = d6.id_descricao
+    LEFT JOIN {TABLE_DESCRICOES} d7 ON p.id_descricao_7 = d7.id_descricao
     {where_clause}
     ORDER BY p.nm_procedimento
     """
@@ -73,7 +87,7 @@ def obter_descricoes_ativas(conn):
     return execute_query(conn, query)
 
 
-def adicionar_procedimento(conn, cd_procedimento, nm_procedimento, id_modalidade, descricoes):
+def adicionar_procedimento(conn, cd_procedimento, nm_procedimento, id_modalidade, ids_descricoes):
     """
     Adiciona um novo procedimento
     
@@ -82,7 +96,7 @@ def adicionar_procedimento(conn, cd_procedimento, nm_procedimento, id_modalidade
         cd_procedimento: Código do procedimento
         nm_procedimento: Nome do procedimento
         id_modalidade: ID da modalidade
-        descricoes: Lista com até 7 descrições
+        ids_descricoes: Lista com até 7 IDs de descrições
         
     Returns:
         True se sucesso, False se erro
@@ -99,18 +113,18 @@ def adicionar_procedimento(conn, cd_procedimento, nm_procedimento, id_modalidade
         st.error(f"❌ Procedimento com código {cd_procedimento} já existe!")
         return False
     
-    # Preparar descrições (até 7)
+    # Preparar IDs de descrições (até 7)
     desc_values = ["NULL"] * 7
-    for i, desc in enumerate(descricoes[:7]):
-        if desc:
-            desc_values[i] = f"'{desc}'"
+    for i, id_desc in enumerate(ids_descricoes[:7]):
+        if id_desc:
+            desc_values[i] = str(id_desc)
     
     # Inserir
     command = f"""
     INSERT INTO {TABLE_PROCEDIMENTOS} (
         cd_procedimento, nm_procedimento, id_modalidade,
-        descricao_1, descricao_2, descricao_3, descricao_4,
-        descricao_5, descricao_6, descricao_7, ativo,
+        id_descricao_1, id_descricao_2, id_descricao_3, id_descricao_4,
+        id_descricao_5, id_descricao_6, id_descricao_7, ativo,
         dt_cadastro, dt_atualizacao
     )
     VALUES (
@@ -274,12 +288,17 @@ def renderizar_pagina_procedimentos(conn):
                 placeholder="Ex: TOMOGRAFIA COMPUTADORIZADA DE ABDOME"
             )
             
-            st.markdown("**Descrições (opcional):**")
-            descricoes = []
-            for i in range(1, 8):
-                desc = st.text_input(f"Descrição {i}:", key=f"desc_manual_{i}")
-                if desc.strip():
-                    descricoes.append(desc.strip())
+            # Multiselect para descrições
+            df_descricoes = obter_descricoes_ativas(conn)
+            if len(df_descricoes) == 0:
+                st.warning("⚠️ Nenhuma descrição cadastrada. Cadastre descrições primeiro.")
+            else:
+                descricoes_selecionadas = st.multiselect(
+                    "Descrições (selecione até 7):",
+                    options=df_descricoes['descricao'].tolist(),
+                    max_selections=7,
+                    help="Selecione as descrições que se aplicam a este procedimento"
+                )
             
             submitted = st.form_submit_button("➕ Adicionar Procedimento")
             
@@ -289,7 +308,14 @@ def renderizar_pagina_procedimentos(conn):
                         df_modalidades['nome_modalidade'] == modalidade_selecionada
                     ]['id_modalidade'].iloc[0]
                     
-                    if adicionar_procedimento(conn, cd_procedimento, nm_procedimento.strip(), id_modalidade, descricoes):
+                    # Converter descrições selecionadas para IDs
+                    ids_descricoes = []
+                    if len(df_descricoes) > 0 and 'descricoes_selecionadas' in locals():
+                        for desc in descricoes_selecionadas:
+                            id_desc = df_descricoes[df_descricoes['descricao'] == desc]['id_descricao'].iloc[0]
+                            ids_descricoes.append(id_desc)
+                    
+                    if adicionar_procedimento(conn, cd_procedimento, nm_procedimento.strip(), id_modalidade, ids_descricoes):
                         st.rerun()
                 else:
                     st.error("❌ Código e Nome do procedimento são obrigatórios")
@@ -326,24 +352,35 @@ def renderizar_pagina_procedimentos(conn):
                         options=df_modalidades['nome_modalidade'].tolist()
                     )
                     
-                    st.markdown("**Descrições (opcional):**")
-                    descricoes = []
-                    for i in range(1, 8):
-                        desc = st.text_input(f"Descrição {i}:", key=f"desc_oracle_codigo_{i}")
-                        if desc.strip():
-                            descricoes.append(desc.strip())
+                    # Multiselect para descrições
+                    df_descricoes = obter_descricoes_ativas(conn)
+                    descricoes_selecionadas = []
+                    if len(df_descricoes) > 0:
+                        descricoes_selecionadas = st.multiselect(
+                            "Descrições (selecione até 7):",
+                            options=df_descricoes['descricao'].tolist(),
+                            max_selections=7,
+                            key="desc_oracle_codigo"
+                        )
                     
                     if st.form_submit_button("➕ Adicionar ao Delta Lake"):
                         id_modalidade = df_modalidades[
                             df_modalidades['nome_modalidade'] == modalidade_selecionada
                         ]['id_modalidade'].iloc[0]
                         
+                        # Converter descrições para IDs
+                        ids_descricoes = []
+                        if len(df_descricoes) > 0:
+                            for desc in descricoes_selecionadas:
+                                id_desc = df_descricoes[df_descricoes['descricao'] == desc]['id_descricao'].iloc[0]
+                                ids_descricoes.append(id_desc)
+                        
                         if adicionar_procedimento(
                             conn,
                             int(proc['CD_PROCEDIMENTO']),
                             proc['NM_PROCEDIMENTO'],
                             id_modalidade,
-                            descricoes
+                            ids_descricoes
                         ):
                             st.rerun()
     
@@ -397,17 +434,28 @@ def renderizar_pagina_procedimentos(conn):
                         options=df_modalidades['nome_modalidade'].tolist()
                     )
                     
-                    st.markdown("**Descrições (aplicadas a todos):**")
-                    descricoes = []
-                    for i in range(1, 8):
-                        desc = st.text_input(f"Descrição {i}:", key=f"desc_oracle_termo_{i}")
-                        if desc.strip():
-                            descricoes.append(desc.strip())
+                    # Multiselect para descrições
+                    df_descricoes = obter_descricoes_ativas(conn)
+                    descricoes_selecionadas = []
+                    if len(df_descricoes) > 0:
+                        descricoes_selecionadas = st.multiselect(
+                            "Descrições (aplicadas a todos, até 7):",
+                            options=df_descricoes['descricao'].tolist(),
+                            max_selections=7,
+                            key="desc_oracle_termo"
+                        )
                     
                     if st.form_submit_button("➕ Adicionar Selecionados ao Delta Lake"):
                         id_modalidade = df_modalidades[
                             df_modalidades['nome_modalidade'] == modalidade_selecionada
                         ]['id_modalidade'].iloc[0]
+                        
+                        # Converter descrições para IDs
+                        ids_descricoes = []
+                        if len(df_descricoes) > 0:
+                            for desc in descricoes_selecionadas:
+                                id_desc = df_descricoes[df_descricoes['descricao'] == desc]['id_descricao'].iloc[0]
+                                ids_descricoes.append(id_desc)
                         
                         sucesso = 0
                         for proc in selecionados:
@@ -416,7 +464,7 @@ def renderizar_pagina_procedimentos(conn):
                                 int(proc['CD_PROCEDIMENTO']),
                                 proc['NM_PROCEDIMENTO'],
                                 id_modalidade,
-                                descricoes
+                                ids_descricoes
                             ):
                                 sucesso += 1
                         

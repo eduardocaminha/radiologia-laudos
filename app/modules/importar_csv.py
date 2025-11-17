@@ -157,6 +157,20 @@ def obter_id_modalidade(conn, nome_modalidade):
     return None
 
 
+def obter_id_descricao(conn, descricao):
+    """Obtém o ID de uma descrição pelo texto"""
+    query = f"""
+    SELECT id_descricao 
+    FROM {TABLE_DESCRICOES} 
+    WHERE UPPER(descricao) = UPPER('{descricao}')
+    LIMIT 1
+    """
+    df = execute_query(conn, query)
+    if len(df) > 0:
+        return df['id_descricao'].iloc[0]
+    return None
+
+
 def importar_procedimentos(conn, df, modalidades_selecionadas=None):
     """
     Importa procedimentos para a tabela Gold
@@ -200,12 +214,17 @@ def importar_procedimentos(conn, df, modalidades_selecionadas=None):
             erros += 1
             continue
         
-        # Preparar descrições
+        # Preparar IDs de descrições
         desc_values = []
         for i in range(1, 8):
             desc = row[f'DESCRICAO_{i}']
             if pd.notna(desc) and str(desc).strip():
-                desc_values.append(f"'{str(desc).strip()}'")
+                # Buscar ID da descrição
+                id_desc = obter_id_descricao(conn, str(desc).strip())
+                if id_desc:
+                    desc_values.append(str(id_desc))
+                else:
+                    desc_values.append("NULL")
             else:
                 desc_values.append("NULL")
         
@@ -213,8 +232,8 @@ def importar_procedimentos(conn, df, modalidades_selecionadas=None):
         command = f"""
         INSERT INTO {TABLE_PROCEDIMENTOS} (
             cd_procedimento, nm_procedimento, id_modalidade,
-            descricao_1, descricao_2, descricao_3, descricao_4,
-            descricao_5, descricao_6, descricao_7, ativo,
+            id_descricao_1, id_descricao_2, id_descricao_3, id_descricao_4,
+            id_descricao_5, id_descricao_6, id_descricao_7, ativo,
             dt_cadastro, dt_atualizacao
         )
         VALUES (
