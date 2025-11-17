@@ -12,6 +12,13 @@ import os
 # Configuração Databricks
 cfg = Config()
 
+# Tentar importar conexão Lake
+try:
+    from database.lake_connection import init_lake_connection, execute_lake_query, LAKE_CONNECTED
+    HAS_LAKE = True
+except:
+    HAS_LAKE = False
+
 @st.cache_resource
 def get_databricks_connection(http_path):
     """
@@ -52,10 +59,12 @@ def get_databricks_connection(http_path):
 def buscar_procedimento_oracle(conn, cd_procedimento=None, termo_busca=None):
     """
     Busca procedimentos no Oracle Lake (RAWZN.RAW_HSP_TB_PROCEDIMENTO)
-    usando a mesma conexão SQL Warehouse do Databricks.
+    
+    Tenta usar biblioteca Lake (run_sql) primeiro.
+    Se não disponível, usa SQL Warehouse (requer acesso ao RAWZN).
     
     Args:
-        conn: Conexão Databricks SQL Warehouse
+        conn: Conexão Databricks SQL Warehouse (usado como fallback)
         cd_procedimento: Código do procedimento para busca exata
         termo_busca: Termo para busca LIKE no nome do procedimento
         
@@ -81,7 +90,22 @@ def buscar_procedimento_oracle(conn, cd_procedimento=None, termo_busca=None):
         else:
             return pd.DataFrame()
         
-        # Executar query via SQL Warehouse
+        # Tentar usar biblioteca Lake primeiro (método preferido)
+        if HAS_LAKE:
+            try:
+                # Inicializar conexão Lake se necessário
+                init_lake_connection()
+                
+                # Executar via run_sql
+                df = execute_lake_query(query)
+                if len(df) > 0:
+                    st.info("✅ Dados obtidos via biblioteca Lake (run_sql)")
+                    return df
+            except Exception as e:
+                st.warning(f"⚠️ Biblioteca Lake falhou, tentando SQL Warehouse: {str(e)}")
+        
+        # Fallback: usar SQL Warehouse
+        st.info("ℹ️ Usando SQL Warehouse para consultar Oracle Lake")
         with conn.cursor() as cursor:
             cursor.execute(query)
             result = cursor.fetchall()
@@ -91,5 +115,5 @@ def buscar_procedimento_oracle(conn, cd_procedimento=None, termo_busca=None):
             
     except Exception as e:
         st.error(f"❌ Erro ao buscar no Oracle Lake: {str(e)}")
-        st.info("💡 Verifique se o SQL Warehouse tem acesso ao schema RAWZN")
+        st.info("💡 Verifique se tem acesso ao schema RAWZN via Lake ou SQL Warehouse")
         return pd.DataFrame()
