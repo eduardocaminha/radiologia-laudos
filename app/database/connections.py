@@ -12,19 +12,6 @@ import os
 # Configuração Databricks
 cfg = Config()
 
-# Verificar se estamos no ambiente Databricks
-IS_DATABRICKS = os.path.exists('/Workspace')
-
-# Importar run_sql se disponível (ambiente Databricks)
-if IS_DATABRICKS:
-    try:
-        # No Databricks, a função run_sql é injetada pelo ambiente
-        # após executar %run /Workspace/Libraries/Lake
-        from pyspark.sql import SparkSession
-        spark = SparkSession.builder.getOrCreate()
-    except:
-        pass
-
 @st.cache_resource
 def get_databricks_connection(http_path):
     """
@@ -62,14 +49,13 @@ def get_databricks_connection(http_path):
         raise
 
 
-def buscar_procedimento_oracle(cd_procedimento=None, termo_busca=None):
+def buscar_procedimento_oracle(conn, cd_procedimento=None, termo_busca=None):
     """
     Busca procedimentos no Oracle Lake (RAWZN.RAW_HSP_TB_PROCEDIMENTO)
-    
-    NOTA: Esta função só funciona dentro do Databricks workspace com Spark SQL.
-    No ambiente local, retorna dados mockados para desenvolvimento.
+    usando a mesma conexão SQL Warehouse do Databricks.
     
     Args:
+        conn: Conexão Databricks SQL Warehouse
         cd_procedimento: Código do procedimento para busca exata
         termo_busca: Termo para busca LIKE no nome do procedimento
         
@@ -77,46 +63,33 @@ def buscar_procedimento_oracle(cd_procedimento=None, termo_busca=None):
         DataFrame com CD_PROCEDIMENTO e NM_PROCEDIMENTO
     """
     try:
-        # Verificar se estamos no ambiente Databricks
-        if IS_DATABRICKS and 'spark' in globals():
-            if cd_procedimento:
-                query = f"""
-                SELECT DISTINCT CD_PROCEDIMENTO, NM_PROCEDIMENTO
-                FROM {ORACLE_TABLE_PROCEDIMENTO_HSP}
-                WHERE CD_PROCEDIMENTO = {cd_procedimento}
-                """
-            elif termo_busca:
-                query = f"""
-                SELECT DISTINCT CD_PROCEDIMENTO, NM_PROCEDIMENTO
-                FROM {ORACLE_TABLE_PROCEDIMENTO_HSP}
-                WHERE UPPER(NM_PROCEDIMENTO) LIKE UPPER('%{termo_busca}%')
-                ORDER BY NM_PROCEDIMENTO
-                LIMIT {MAX_RESULTADOS_BUSCA}
-                """
-            else:
-                return pd.DataFrame()
-            
-            # Executar via Spark SQL e converter para Pandas
-            spark_df = spark.sql(query)
-            df = spark_df.toPandas()
-            return df
+        # Construir query
+        if cd_procedimento:
+            query = f"""
+            SELECT DISTINCT CD_PROCEDIMENTO, NM_PROCEDIMENTO
+            FROM {ORACLE_TABLE_PROCEDIMENTO_HSP}
+            WHERE CD_PROCEDIMENTO = {cd_procedimento}
+            """
+        elif termo_busca:
+            query = f"""
+            SELECT DISTINCT CD_PROCEDIMENTO, NM_PROCEDIMENTO
+            FROM {ORACLE_TABLE_PROCEDIMENTO_HSP}
+            WHERE UPPER(NM_PROCEDIMENTO) LIKE UPPER('%{termo_busca}%')
+            ORDER BY NM_PROCEDIMENTO
+            LIMIT {MAX_RESULTADOS_BUSCA}
+            """
         else:
-            # Ambiente local - retornar mock para desenvolvimento
-            st.warning("⚠️ Ambiente local detectado. Usando dados mockados para Oracle Lake.")
-            if cd_procedimento:
-                return pd.DataFrame({
-                    'CD_PROCEDIMENTO': [cd_procedimento],
-                    'NM_PROCEDIMENTO': [f'PROCEDIMENTO MOCK {cd_procedimento}']
-                })
-            else:
-                return pd.DataFrame({
-                    'CD_PROCEDIMENTO': [12345, 67890, 11111],
-                    'NM_PROCEDIMENTO': [
-                        'TOMOGRAFIA COMPUTADORIZADA DE ABDOME MOCK',
-                        'ANGIOTOMOGRAFIA DE AORTA MOCK',
-                        'RESSONANCIA MAGNETICA MOCK'
-                    ]
-                })
+            return pd.DataFrame()
+        
+        # Executar query via SQL Warehouse
+        with conn.cursor() as cursor:
+            cursor.execute(query)
+            result = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            df = pd.DataFrame(result, columns=columns)
+            return df
+            
     except Exception as e:
-        st.error(f"❌ Erro ao buscar no Oracle: {str(e)}")
+        st.error(f"❌ Erro ao buscar no Oracle Lake: {str(e)}")
+        st.info("💡 Verifique se o SQL Warehouse tem acesso ao schema RAWZN")
         return pd.DataFrame()
