@@ -93,7 +93,7 @@ with st.sidebar.expander("⚙️ Configurações Avançadas", expanded=False):
 # =====================================================================
 
 st.sidebar.markdown("---")
-st.sidebar.header("� Navegação")
+st.sidebar.header("Navegação")
 
 pagina = st.sidebar.radio(
     "Selecione a página:",

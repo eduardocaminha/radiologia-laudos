@@ -4,7 +4,7 @@ Módulo de gerenciamento de Descrições
 
 import streamlit as st
 import pandas as pd
-from config import TABLE_DESCRICOES
+from config import TABLE_DESCRICOES, TABLE_PROCEDIMENTOS
 from database import execute_query, execute_command
 
 
@@ -120,6 +120,45 @@ def alternar_status_descricao(conn, id_descricao, ativo):
     return False
 
 
+def substituir_descricao_em_procedimentos(conn, id_origem, id_destino):
+    """
+    Substitui todas as ocorrências de uma descrição por outra nos procedimentos
+    
+    Args:
+        conn: Conexão com Databricks
+        id_origem: ID da descrição a ser substituída
+        id_destino: ID da descrição que substituirá
+        
+    Returns:
+        Número de procedimentos atualizados
+    """
+    total_atualizados = 0
+    
+    # Atualizar cada coluna de descrição (id_descricao_1 a id_descricao_7)
+    for i in range(1, 8):
+        command = f"""
+        UPDATE {TABLE_PROCEDIMENTOS}
+        SET id_descricao_{i} = {id_destino},
+            dt_atualizacao = CURRENT_TIMESTAMP()
+        WHERE id_descricao_{i} = {id_origem}
+        """
+        
+        # Contar quantos foram atualizados
+        query_count = f"""
+        SELECT COUNT(*) as total
+        FROM {TABLE_PROCEDIMENTOS}
+        WHERE id_descricao_{i} = {id_origem}
+        """
+        df_count = execute_query(conn, query_count)
+        count = df_count['total'].iloc[0] if len(df_count) > 0 else 0
+        
+        if count > 0:
+            if execute_command(conn, command):
+                total_atualizados += count
+    
+    return total_atualizados
+
+
 def renderizar_pagina_descricoes(conn):
     """
     Renderiza a página de gerenciamento de descrições
@@ -130,7 +169,7 @@ def renderizar_pagina_descricoes(conn):
     st.subheader("📝 Gerenciamento de Descrições")
     
     # Tabs para organizar funcionalidades
-    tab_listar, tab_adicionar = st.tabs(["📋 Listar", "➕ Adicionar"])
+    tab_listar, tab_adicionar, tab_mesclar = st.tabs(["📋 Listar", "➕ Adicionar", "🔀 Mesclar"])
     
     # ===== TAB: LISTAR =====
     with tab_listar:
@@ -241,7 +280,82 @@ def renderizar_pagina_descricoes(conn):
             
             if submitted:
                 if descricao.strip():
-                    if adicionar_descricao(conn, descricao.strip().upper()):
+                    if adicionar_descricao(conn, descricao.strip()):
                         st.rerun()
                 else:
                     st.error("❌ Descrição não pode ser vazia")
+    
+    # ===== TAB: MESCLAR =====
+    with tab_mesclar:
+        st.markdown("### 🔀 Mesclar/Substituir Descrições")
+        
+        st.info("""
+        Use esta funcionalidade para substituir uma descrição por outra em todos os procedimentos.
+        Útil para corrigir duplicatas ou padronizar nomenclaturas (ex: VENOSO → VENOSA).
+        """)
+        
+        # Carregar todas as descrições
+        df_todas = listar_descricoes(conn, apenas_ativas=False)
+        
+        if len(df_todas) == 0:
+            st.warning("⚠️ Nenhuma descrição cadastrada")
+        else:
+            with st.form("form_mesclar_descricoes"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("**Descrição a ser substituída:**")
+                    desc_origem = st.selectbox(
+                        "Selecione a descrição que será substituída:",
+                        options=df_todas['descricao'].tolist(),
+                        key="desc_origem"
+                    )
+                
+                with col2:
+                    st.markdown("**Substituir por:**")
+                    desc_destino = st.selectbox(
+                        "Selecione a descrição que permanecerá:",
+                        options=df_todas['descricao'].tolist(),
+                        key="desc_destino"
+                    )
+                
+                st.warning(f"""
+                ⚠️ **ATENÇÃO:** Esta ação irá:
+                1. Substituir todas as ocorrências de "**{desc_origem}**" por "**{desc_destino}**" nos procedimentos
+                2. Desativar a descrição "**{desc_origem}**"
+                
+                Esta ação **NÃO pode ser desfeita**!
+                """)
+                
+                confirmar = st.text_input(
+                    "Digite 'CONFIRMAR' para prosseguir:",
+                    key="confirmar_mesclar"
+                )
+                
+                submitted = st.form_submit_button("🔀 Mesclar Descrições", type="primary")
+                
+                if submitted:
+                    if confirmar == "CONFIRMAR":
+                        if desc_origem == desc_destino:
+                            st.error("❌ As descrições devem ser diferentes!")
+                        else:
+                            # Obter IDs
+                            id_origem = df_todas[df_todas['descricao'] == desc_origem]['id_descricao'].iloc[0]
+                            id_destino = df_todas[df_todas['descricao'] == desc_destino]['id_descricao'].iloc[0]
+                            
+                            with st.spinner("Substituindo descrições nos procedimentos..."):
+                                total = substituir_descricao_em_procedimentos(conn, id_origem, id_destino)
+                            
+                            if total > 0:
+                                st.success(f"✅ {total} ocorrência(s) substituída(s) com sucesso!")
+                            else:
+                                st.info("ℹ️ Nenhum procedimento usava esta descrição")
+                            
+                            # Desativar descrição origem
+                            alternar_status_descricao(conn, id_origem, False)
+                            st.info(f"ℹ️ Descrição '{desc_origem}' foi desativada")
+                            
+                            st.balloons()
+                            st.rerun()
+                    else:
+                        st.error("❌ Digite 'CONFIRMAR' para prosseguir")
