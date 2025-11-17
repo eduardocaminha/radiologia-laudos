@@ -80,6 +80,17 @@ st.markdown("""
         cursor: pointer;
         padding: 0.5rem;
     }
+    
+    /* Esconder texto do ícone do expander */
+    .streamlit-expanderHeader svg + div {
+        display: none;
+    }
+    
+    /* Garantir que o título do expander apareça */
+    .streamlit-expanderHeader p {
+        display: block !important;
+        margin: 0 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -122,7 +133,7 @@ with st.spinner("Verificando tabelas Gold..."):
 
 # Botão de reset (apenas para admin/desenvolvimento)
 st.sidebar.markdown("---")
-with st.sidebar.expander("⚙️ Configurações Avançadas"):
+with st.sidebar.expander("⚙️ Configurações Avançadas", expanded=False):
     st.warning("⚠️ **CUIDADO**: Esta ação deleta TODAS as tabelas e dados!")
     confirmar_reset = st.text_input(
         "Digite 'DELETAR' para confirmar:",
