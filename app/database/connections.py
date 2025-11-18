@@ -52,15 +52,12 @@ def get_databricks_connection(http_path):
         raise
 
 
-def buscar_procedimento_oracle(conn, cd_procedimento=None, termo_busca=None):
+def buscar_procedimento_oracle(cd_procedimento=None, termo_busca=None):
     """
     Busca procedimentos no Oracle Lake (RAWZN.RAW_HSP_TB_PROCEDIMENTO)
-    
-    Tenta usar biblioteca Lake (run_sql) primeiro.
-    Se não disponível, usa SQL Warehouse (requer acesso ao RAWZN).
+    usando JayDeBeAPI via JDBC (mesma abordagem da biblioteca Lake)
     
     Args:
-        conn: Conexão Databricks SQL Warehouse (usado como fallback)
         cd_procedimento: Código do procedimento para busca exata
         termo_busca: Termo para busca LIKE no nome do procedimento
         
@@ -86,16 +83,14 @@ def buscar_procedimento_oracle(conn, cd_procedimento=None, termo_busca=None):
         else:
             return pd.DataFrame()
         
-        # Usar conexão Lake via JayDeBeAPI (mesma abordagem dos notebooks)
+        # Executar no Oracle Lake via JayDeBeAPI
         df = execute_lake_query(query)
         
         if df is not None and len(df) > 0:
             return df
         
-        # Se retornou vazio, retornar DataFrame vazio
         return pd.DataFrame()
             
     except Exception as e:
         st.error(f"❌ Erro ao buscar no Oracle Lake: {str(e)}")
-        st.info("💡 Verifique se tem acesso ao schema RAWZN via Lake ou SQL Warehouse")
         return pd.DataFrame()

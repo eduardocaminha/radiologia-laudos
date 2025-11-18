@@ -274,7 +274,7 @@ def renderizar_pagina_procedimentos(conn):
         
         if st.button("🔍 Buscar no Oracle", key="btn_buscar_codigo"):
             with st.spinner("Buscando no Oracle Lake..."):
-                df_resultado = buscar_procedimento_oracle(conn, cd_procedimento=cd_busca)
+                df_resultado = buscar_procedimento_oracle(cd_procedimento=cd_busca)
             
             if len(df_resultado) == 0:
                 st.warning(f"⚠️ Procedimento {cd_busca} não encontrado no Oracle Lake")
@@ -338,7 +338,7 @@ def renderizar_pagina_procedimentos(conn):
         if st.button("🔎 Buscar no Oracle", key="btn_buscar_termo"):
             if termo_busca.strip():
                 with st.spinner("Buscando no Oracle Lake..."):
-                    df_resultados = buscar_procedimento_oracle(conn, termo_busca=termo_busca.strip())
+                    df_resultados = buscar_procedimento_oracle(termo_busca=termo_busca.strip())
                 
                 if len(df_resultados) == 0:
                     st.warning(f"⚠️ Nenhum procedimento encontrado com o termo '{termo_busca}'")
