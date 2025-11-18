@@ -2,6 +2,15 @@
 image:
   dockerfile: Dockerfile
 
+command: [
+  'streamlit',
+  'run', 
+  'app.py',
+  '--server.port=8501',
+  '--server.address=0.0.0.0',
+  '--server.headless=true'
+]
+
 env:
   - name: 'DATABRICKS_HTTP_PATH'
     value: '/sql/1.0/warehouses/784d0df97cfe75af'
