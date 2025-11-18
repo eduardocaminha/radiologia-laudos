@@ -12,12 +12,8 @@ import os
 # Configuração Databricks
 cfg = Config()
 
-# Tentar importar conexão Lake
-try:
-    from database.lake_connection import init_lake_connection, execute_lake_query, LAKE_CONNECTED
-    HAS_LAKE = True
-except:
-    HAS_LAKE = False
+# Importar conexão Lake
+from database.lake_connection import init_lake_connection, execute_lake_query
 
 @st.cache_resource
 def get_databricks_connection(http_path):
@@ -90,28 +86,14 @@ def buscar_procedimento_oracle(conn, cd_procedimento=None, termo_busca=None):
         else:
             return pd.DataFrame()
         
-        # Tentar usar biblioteca Lake primeiro (método preferido)
-        if HAS_LAKE:
-            try:
-                # Inicializar conexão Lake se necessário
-                init_lake_connection()
-                
-                # Executar via run_sql
-                df = execute_lake_query(query)
-                if len(df) > 0:
-                    st.info("✅ Dados obtidos via biblioteca Lake (run_sql)")
-                    return df
-            except Exception as e:
-                st.warning(f"⚠️ Biblioteca Lake falhou, tentando SQL Warehouse: {str(e)}")
+        # Usar conexão Lake via JayDeBeAPI (mesma abordagem dos notebooks)
+        df = execute_lake_query(query)
         
-        # Fallback: usar SQL Warehouse
-        st.info("ℹ️ Usando SQL Warehouse para consultar Oracle Lake")
-        with conn.cursor() as cursor:
-            cursor.execute(query)
-            result = cursor.fetchall()
-            columns = [desc[0] for desc in cursor.description]
-            df = pd.DataFrame(result, columns=columns)
+        if df is not None and len(df) > 0:
             return df
+        
+        # Se retornou vazio, retornar DataFrame vazio
+        return pd.DataFrame()
             
     except Exception as e:
         st.error(f"❌ Erro ao buscar no Oracle Lake: {str(e)}")

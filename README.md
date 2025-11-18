@@ -27,8 +27,34 @@ streamlit run app.py
 
 O app tenta carregar automaticamente `../procedimentos.csv`. Caso o arquivo esteja em outro caminho, utilize o uploader na interface.
 
-## Publicação (Databricks Apps)
+## Publicação (Databricks)
 
-1. Faça upload desta pasta para o workspace.
-2. Crie um App apontando para `app/app.py` (utilize `app/app.yaml` como blueprint).
-3. Conceda permissões ao SQL Warehouse e ao diretório Delta/Lakehouse onde a tabela será gravada.
+### Pré-requisitos
+- **Cluster Databricks** (NÃO Serverless) com Spark
+- Driver JDBC Oracle em `/Workspace/Libraries/DatalakeConnector/ojdbc11.jar`
+- Acesso ao scope `INNOVATION_RAW` no Secrets Manager
+- SQL Warehouse configurado para Delta Lake
+
+### Setup
+
+1. Faça upload desta pasta para o workspace
+2. No cluster, instale as dependências:
+   ```bash
+   %pip install -r /Workspace/path/to/app/requirements.txt
+   ```
+3. Configure a variável de ambiente:
+   ```python
+   import os
+   os.environ['DATABRICKS_HTTP_PATH'] = '/sql/1.0/warehouses/<seu_warehouse_id>'
+   ```
+4. Execute o Streamlit:
+   ```bash
+   streamlit run /Workspace/path/to/app/app.py --server.port 8501
+   ```
+
+### Como funciona
+
+- **Delta Lake (Gold)**: Usa SQL Warehouse via `databricks-sql-connector`
+- **Oracle Lake (RAWZN)**: Usa JayDeBeAPI + JDBC (mesma abordagem da biblioteca Lake)
+- Credenciais obtidas via `dbutils.secrets` automaticamente
+- Conexão Oracle configurada como ReadOnly com prefetch de 10k linhas
