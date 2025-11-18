@@ -27,32 +27,19 @@ def init_lake_connection():
             st.error("❌ Biblioteca JayDeBeAPI não instalada. Execute: pip install JayDeBeAPI")
             return None
         
-        # Verificar se dbutils está disponível (injetado pelo Databricks)
-        try:
-            # No Databricks, dbutils já está disponível globalmente
-            if 'dbutils' not in globals():
-                # Tentar obter do IPython/Databricks runtime
-                from IPython import get_ipython
-                ipython = get_ipython()
-                if ipython and hasattr(ipython, 'user_ns'):
-                    dbutils = ipython.user_ns.get('dbutils')
-                    if dbutils is None:
-                        raise RuntimeError("dbutils não encontrado no namespace")
-                else:
-                    raise RuntimeError("Ambiente IPython não disponível")
-            else:
-                dbutils = globals()['dbutils']
-        except Exception as e:
-            st.error(f"❌ Erro ao acessar dbutils: {str(e)}")
-            st.info("💡 Certifique-se de estar rodando em um cluster Databricks (não Serverless)")
-            return None
+        # Obter credenciais
+        # No Databricks Apps (serverless), usar variáveis de ambiente
+        username = "USR_PROD_INFORMATICA_SAUDE"
+        password = os.environ.get("ORACLE_PASSWORD")
         
-        # Obter credenciais do Secrets Manager
-        try:
-            username = "USR_PROD_INFORMATICA_SAUDE"
-            password = dbutils.secrets.get(scope="INNOVATION_RAW", key="USR_PROD_INFORMATICA_SAUDE")
-        except Exception as e:
-            st.error(f"❌ Erro ao obter credenciais: {str(e)}")
+        if not password:
+            st.error("❌ Senha do Oracle não configurada")
+            st.info("""
+            💡 Configure a variável de ambiente ORACLE_PASSWORD no Databricks App:
+            1. Vá em App Settings
+            2. Adicione Environment Variable: ORACLE_PASSWORD
+            3. Use o valor do secret INNOVATION_RAW/USR_PROD_INFORMATICA_SAUDE
+            """)
             return None
         
         # String JDBC para RAWZN LOW (mesma do Lake.py)
