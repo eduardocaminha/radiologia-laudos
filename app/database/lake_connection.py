@@ -27,15 +27,23 @@ def init_lake_connection():
             st.error("❌ Biblioteca JayDeBeAPI não instalada. Execute: pip install JayDeBeAPI")
             return None
         
-        # Importar dbutils para secrets
+        # Verificar se dbutils está disponível (injetado pelo Databricks)
         try:
-            from pyspark.dbutils import DBUtils
-            from pyspark.sql import SparkSession
-            
-            spark = SparkSession.builder.getOrCreate()
-            dbutils = DBUtils(spark)
+            # No Databricks, dbutils já está disponível globalmente
+            if 'dbutils' not in globals():
+                # Tentar obter do IPython/Databricks runtime
+                from IPython import get_ipython
+                ipython = get_ipython()
+                if ipython and hasattr(ipython, 'user_ns'):
+                    dbutils = ipython.user_ns.get('dbutils')
+                    if dbutils is None:
+                        raise RuntimeError("dbutils não encontrado no namespace")
+                else:
+                    raise RuntimeError("Ambiente IPython não disponível")
+            else:
+                dbutils = globals()['dbutils']
         except Exception as e:
-            st.error(f"❌ Erro ao acessar Spark/dbutils: {str(e)}")
+            st.error(f"❌ Erro ao acessar dbutils: {str(e)}")
             st.info("💡 Certifique-se de estar rodando em um cluster Databricks (não Serverless)")
             return None
         
