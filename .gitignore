@@ -2,9 +2,6 @@
 *.jar
 ojdbc*.jar
 
-# Secrets (não commitar senhas!)
-app.yaml
-
 # Python
 __pycache__/
 *.py[cod]

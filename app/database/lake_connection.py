@@ -28,17 +28,26 @@ def init_lake_connection():
             return None
         
         # Obter credenciais
-        # No Databricks Apps (serverless), usar variáveis de ambiente
+        # No Databricks Apps, usar secrets (recomendação do admin)
         username = "USR_PROD_INFORMATICA_SAUDE"
-        password = os.environ.get("ORACLE_PASSWORD")
+        
+        # Tentar obter senha do Streamlit secrets (Databricks App secrets)
+        try:
+            password = st.secrets.get("ORACLE_PASSWORD")
+        except:
+            password = None
+        
+        # Fallback: variável de ambiente
+        if not password:
+            password = os.environ.get("ORACLE_PASSWORD")
         
         if not password:
             st.error("❌ Senha do Oracle não configurada")
             st.info("""
-            💡 Configure a variável de ambiente ORACLE_PASSWORD no Databricks App:
-            1. Vá em App Settings
-            2. Adicione Environment Variable: ORACLE_PASSWORD
-            3. Use o valor do secret INNOVATION_RAW/USR_PROD_INFORMATICA_SAUDE
+            💡 Configure o secret ORACLE_PASSWORD no Databricks App:
+            1. Vá em App Settings → Secrets
+            2. Adicione: ORACLE_PASSWORD = (senha do USR_PROD_INFORMATICA_SAUDE)
+            3. O secret fica protegido e não aparece no código fonte
             """)
             return None
         
