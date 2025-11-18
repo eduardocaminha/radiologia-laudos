@@ -1,8 +1,7 @@
-command: [
-  'streamlit', 
-  'run',
-  'app.py'
-]
+# Usar container Docker customizado com Java
+image:
+  dockerfile: Dockerfile
+
 env:
   - name: 'DATABRICKS_HTTP_PATH'
     value: '/sql/1.0/warehouses/784d0df97cfe75af'
