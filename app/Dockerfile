@@ -26,7 +26,7 @@ EXPOSE 8501
 
 # Comando para rodar o app
 CMD ["streamlit", "run", "app.py", \
-     "--server.port=8501", \
+     "--server.port=8000", \
      "--server.address=0.0.0.0", \
      "--server.headless=true", \
      "--browser.gatherUsageStats=false"]

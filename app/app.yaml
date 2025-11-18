@@ -1,7 +1,3 @@
-# Usar container Docker customizado com Java
-image:
-  dockerfile: Dockerfile
-
 command: ['streamlit', 'run', 'app.py']
 
 env:
