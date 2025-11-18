@@ -46,10 +46,19 @@ def init_lake_connection():
         jdbc_url = 'jdbc:oracle:thin:@(description=(retry_count=2)(retry_delay=3)(SOURCE_ROUTE = YES)(ADDRESS = (PROTOCOL = TCP)(HOST = 10.20.1.79)(PORT = 1521))(address=(protocol=tcps)(port=1522)(host=dbraw.adb.sa-saopaulo-1.oraclecloud.com))(connect_data=(service_name=ga7aea8a1e872fc_dbrawzn_low.adb.oraclecloud.com))(security=(ssl_server_cert_dn="CN=adb.sa-saopaulo-1.oraclecloud.com, OU=Oracle ADB SAOPAULO, O=Oracle Corporation, L=Redwood City, ST=California, C=US")))'
         
         # Caminho do driver JDBC
-        jdbc_driver_path = "/Workspace/Libraries/DatalakeConnector/ojdbc11.jar"
+        # Tentar caminho relativo (para Databricks Apps) primeiro
+        jdbc_driver_path = os.path.join(os.path.dirname(__file__), '..', 'ojdbc11.jar')
+        
+        # Fallback: caminho absoluto (para clusters)
+        if not os.path.exists(jdbc_driver_path):
+            jdbc_driver_path = "/Workspace/Libraries/DatalakeConnector/ojdbc11.jar"
         
         if not os.path.exists(jdbc_driver_path):
-            st.error(f"❌ Driver JDBC não encontrado: {jdbc_driver_path}")
+            st.error(f"❌ Driver JDBC não encontrado")
+            st.info("""
+            💡 Para Databricks Apps, coloque o arquivo ojdbc11.jar na pasta app/
+            Para clusters, o driver deve estar em /Workspace/Libraries/DatalakeConnector/
+            """)
             return None
         
         # Conectar ao Oracle

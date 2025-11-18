@@ -1,0 +1,19 @@
+# Databricks
+*.jar
+ojdbc*.jar
+
+# Secrets (não commitar senhas!)
+app.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# Streamlit
+.streamlit/secrets.toml
