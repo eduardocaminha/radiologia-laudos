@@ -141,15 +141,44 @@ df_procedimentos.show(10, truncate=False)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 5. Criar Tabela Temporária Otimizada
+# MAGIC ## 5. Criar Tabela Temporária no Oracle e Extrair Laudos
 
 # COMMAND ----------
 
-print("🔧 Criando tabela temporária com procedimentos filtrados...")
+print("🔧 Criando tabela temporária no Oracle Lake...")
+print(f"📅 Período: {data_inicio} até {data_fim}")
+print(f"🔢 Códigos: {len(lista_codigos)} procedimentos")
 
-# Query para criar tabela temporária
-# Estratégia: filtrar por período e códigos ANTES do join
-query_temp_table = f"""
+# Estratégia otimizada:
+# 1. Criar tabela temporária NO ORACLE com procedimentos filtrados
+# 2. Fazer join NO ORACLE usando a temp table
+# 3. Trazer apenas o resultado final para o Databricks
+
+# Passo 1: Criar tabela temporária no Oracle
+query_create_temp = f"""
+CREATE GLOBAL TEMPORARY TABLE temp_proc_radiologia (
+    CD_ATENDIMENTO NUMBER,
+    CD_OCORRENCIA NUMBER,
+    CD_ORDEM NUMBER,
+    CD_PROCEDIMENTO NUMBER,
+    DT_PROCEDIMENTO_REALIZADO DATE,
+    CD_PACIENTE NUMBER
+) ON COMMIT PRESERVE ROWS
+"""
+
+try:
+    run_sql(query_create_temp)
+    print("✅ Tabela temporária criada no Oracle")
+except Exception as e:
+    # Tabela já existe (normal em re-execuções)
+    if "ORA-00955" in str(e) or "name is already used" in str(e):
+        print("ℹ️  Tabela temporária já existe, será reaproveitada")
+    else:
+        raise e
+
+# Passo 2: Popular tabela temporária
+query_insert_temp = f"""
+INSERT INTO temp_proc_radiologia
 SELECT /*+ PARALLEL(8) */
     PREA.CD_ATENDIMENTO,
     PREA.CD_OCORRENCIA,
@@ -163,68 +192,46 @@ WHERE PREA.CD_PROCEDIMENTO IN ({codigos_csv})
   AND PREA.DT_PROCEDIMENTO_REALIZADO < DATE '{data_fim}'
 """
 
-print(f"📅 Período: {data_inicio} até {data_fim}")
-print(f"🔢 Códigos: {len(lista_codigos)} procedimentos")
+run_sql(query_insert_temp)
+print("✅ Tabela temporária populada no Oracle")
 
-# Executar query e criar DataFrame temporário
-df_procedimentos_realizados = run_sql(query_temp_table)
+# Verificar quantos registros foram inseridos
+query_count = "SELECT COUNT(*) as total FROM temp_proc_radiologia"
+df_count = run_sql(query_count)
+total_procedimentos = df_count['total'].iloc[0]
 
-if len(df_procedimentos_realizados) == 0:
+if total_procedimentos == 0:
     print(f"⚠️ Nenhum procedimento realizado encontrado no período {data_inicio} - {data_fim}")
     dbutils.notebook.exit("Nenhum procedimento realizado no período")
 
-print(f"✅ {len(df_procedimentos_realizados):,} procedimentos realizados encontrados")
-
-# Estatísticas do pandas DataFrame
-print("\n📊 Estatísticas da extração:")
-print(f"   - Registros: {len(df_procedimentos_realizados):,}")
-print(f"   - Atendimentos únicos: {df_procedimentos_realizados['CD_ATENDIMENTO'].nunique():,}")
-print(f"   - Pacientes únicos: {df_procedimentos_realizados['CD_PACIENTE'].nunique():,}")
-
-# Converter para Spark DataFrame para otimizações
-df_proc_spark = spark.createDataFrame(df_procedimentos_realizados)
-
-# Criar view temporária
-df_proc_spark.createOrReplaceTempView("temp_procedimentos_realizados")
-
-# Cache para otimizar joins
-df_proc_spark.cache()
-print("✅ Tabela temporária criada e cacheada!")
+print(f"✅ {total_procedimentos:,} procedimentos realizados encontrados")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 6. Extrair Laudos com Join Otimizado
+# MAGIC ## 6. Extrair Laudos com Join no Oracle
 
 # COMMAND ----------
 
-print("🔍 Extraindo laudos com join otimizado...")
+print("🔍 Extraindo laudos com join otimizado NO ORACLE...")
 
-# Query otimizada com join
-# Estratégia: usar a tabela temporária (já filtrada) para join com tb_laudo_paciente
+# Query otimizada: JOIN acontece NO ORACLE usando a tabela temporária
+# Muito mais eficiente que trazer dados para Databricks e fazer join lá
 query_laudos = f"""
-SELECT /*+ BROADCAST(temp) */
-    temp.CD_ATENDIMENTO as cd_atendimento,
-    temp.CD_OCORRENCIA as cd_ocorrencia,
-    temp.CD_ORDEM as cd_ordem,
-    CONCAT(
-        CAST(temp.CD_ATENDIMENTO AS STRING),
-        CAST(temp.CD_OCORRENCIA AS STRING),
-        CAST(temp.CD_ORDEM AS STRING)
-    ) as accession_number,
-    temp.CD_PROCEDIMENTO as cd_procedimento,
-    temp.CD_PACIENTE as cd_paciente,
-    P.NM_PROCEDIMENTO as nm_procedimento,
-    LAUP.DS_LAUDO_MEDICO as ds_laudo_medico,
-    temp.DT_PROCEDIMENTO_REALIZADO as dt_procedimento_realizado,
-    YEAR(temp.DT_PROCEDIMENTO_REALIZADO) as ano,
-    MONTH(temp.DT_PROCEDIMENTO_REALIZADO) as mes,
-    CONCAT(
-        YEAR(temp.DT_PROCEDIMENTO_REALIZADO), 
-        '-', 
-        LPAD(MONTH(temp.DT_PROCEDIMENTO_REALIZADO), 2, '0')
-    ) as ano_mes
-FROM temp_procedimentos_realizados temp
+SELECT /*+ PARALLEL(8) */
+    temp.CD_ATENDIMENTO,
+    temp.CD_OCORRENCIA,
+    temp.CD_ORDEM,
+    TO_CHAR(temp.CD_ATENDIMENTO) || TO_CHAR(temp.CD_OCORRENCIA) || TO_CHAR(temp.CD_ORDEM) as ACCESSION_NUMBER,
+    temp.CD_PROCEDIMENTO,
+    temp.CD_PACIENTE,
+    P.NM_PROCEDIMENTO,
+    LAUP.DS_LAUDO_MEDICO,
+    temp.DT_PROCEDIMENTO_REALIZADO,
+    EXTRACT(YEAR FROM temp.DT_PROCEDIMENTO_REALIZADO) as ANO,
+    EXTRACT(MONTH FROM temp.DT_PROCEDIMENTO_REALIZADO) as MES,
+    TO_CHAR(temp.DT_PROCEDIMENTO_REALIZADO, 'YYYY-MM') as ANO_MES
+FROM temp_proc_radiologia temp
 INNER JOIN RAWZN.RAW_HSP_TB_PROCEDIMENTO P
     ON temp.CD_PROCEDIMENTO = P.CD_PROCEDIMENTO
 INNER JOIN RAWZN.RAW_HSP_TB_LAUDO_PACIENTE LAUP
@@ -235,16 +242,24 @@ WHERE LAUP.DS_LAUDO_MEDICO IS NOT NULL
   AND LENGTH(TRIM(LAUP.DS_LAUDO_MEDICO)) > 0
 """
 
-# Executar extração
+# Executar extração (join acontece no Oracle)
 df_laudos_pd = run_sql(query_laudos)
 
 if len(df_laudos_pd) == 0:
     print(f"⚠️ Nenhum laudo encontrado para o período {data_inicio} - {data_fim}")
-    # Limpar cache
-    df_proc_spark.unpersist()
     dbutils.notebook.exit("Nenhum laudo encontrado")
 
 print(f"✅ {len(df_laudos_pd):,} laudos extraídos com sucesso!")
+
+# Limpar tabela temporária do Oracle
+try:
+    run_sql("TRUNCATE TABLE temp_proc_radiologia")
+    print("🧹 Tabela temporária do Oracle limpa")
+except:
+    pass
+
+# Renomear colunas para minúsculo (padrão Delta Lake)
+df_laudos_pd.columns = [col.lower() for col in df_laudos_pd.columns]
 
 # Converter para Spark DataFrame
 df_laudos = spark.createDataFrame(df_laudos_pd)
