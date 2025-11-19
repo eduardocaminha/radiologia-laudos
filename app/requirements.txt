@@ -3,3 +3,4 @@ pandas>=1.5.0
 databricks-sql-connector>=3.0.0
 JayDeBeAPI>=1.2.3
 install-jdk>=1.1.0
+requests>=2.31.0

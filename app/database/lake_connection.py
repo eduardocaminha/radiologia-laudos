@@ -1,15 +1,53 @@
 """
-Conexão com Oracle Lake usando JayDeBeAPI (mesma abordagem da biblioteca Lake)
-Adaptado para funcionar no Streamlit rodando em cluster Databricks
+Conexão com Oracle Lake
+- Em Databricks Apps: usa Serving Endpoint (API HTTP)
+- Em cluster: usa JayDeBeAPI direto
 """
 
 import streamlit as st
 import pandas as pd
 import os
 import sys
+import requests
 
 # Conexão global com Oracle Lake
 _lake_connection = None
+
+# URL do Serving Endpoint (configurar via env var)
+ORACLE_ENDPOINT_URL = os.environ.get('ORACLE_ENDPOINT_URL')
+
+
+def execute_lake_query_via_endpoint(query):
+    """
+    Executa query no Oracle Lake via Serving Endpoint (HTTP)
+    Usado em Databricks Apps onde JayDeBeAPI não funciona
+    """
+    if not ORACLE_ENDPOINT_URL:
+        st.error("❌ ORACLE_ENDPOINT_URL não configurado")
+        return pd.DataFrame()
+    
+    try:
+        response = requests.post(
+            f"{ORACLE_ENDPOINT_URL}/query",
+            json={'query': query},
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            if result.get('success'):
+                return pd.DataFrame(result['data'])
+            else:
+                st.error(f"❌ Erro no endpoint: {result.get('error')}")
+                return pd.DataFrame()
+        else:
+            st.error(f"❌ Erro HTTP {response.status_code}: {response.text}")
+            return pd.DataFrame()
+            
+    except Exception as e:
+        st.error(f"❌ Erro ao chamar endpoint: {str(e)}")
+        return pd.DataFrame()
+
 
 @st.cache_resource
 def init_lake_connection():
@@ -113,8 +151,9 @@ def init_lake_connection():
 
 def execute_lake_query(query):
     """
-    Executa query no Oracle Lake usando JayDeBeAPI
-    Mesma lógica da função run_sql do Lake.py
+    Executa query no Oracle Lake
+    - Se ORACLE_ENDPOINT_URL configurado: usa API HTTP
+    - Senão: usa JayDeBeAPI direto
     
     Args:
         query: Query SQL para executar
@@ -122,6 +161,11 @@ def execute_lake_query(query):
     Returns:
         DataFrame pandas com os resultados
     """
+    # Se endpoint configurado, usar API HTTP
+    if ORACLE_ENDPOINT_URL:
+        return execute_lake_query_via_endpoint(query)
+    
+    # Senão, usar JayDeBeAPI direto
     global _lake_connection
     
     try:
