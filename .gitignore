@@ -8,9 +8,8 @@ __pycache__/
 venv/
 ENV/
 
-# Databricks
+# JDBC Driver (não commitar, já existe no Databricks)
 *.jar
-ojdbc*.jar
 
 # Streamlit
 .streamlit/secrets.toml
