@@ -154,7 +154,16 @@ print(f"🔢 Códigos: {len(lista_codigos)} procedimentos")
 # 2. Fazer join NO ORACLE usando a temp table
 # 3. Trazer apenas o resultado final para o Databricks
 
-# Passo 1: Criar tabela temporária no Oracle
+# Passo 1: Dropar tabela temporária se existir (garante estrutura correta)
+try:
+    run_sql("DROP TABLE temp_proc_radiologia")
+    print("🗑️  Tabela temporária antiga removida")
+except Exception as e:
+    # Tabela não existe (normal na primeira execução)
+    if "ORA-00942" not in str(e):  # ORA-00942 = table or view does not exist
+        print(f"⚠️  Aviso ao dropar tabela: {str(e)[:100]}")
+
+# Passo 2: Criar tabela temporária no Oracle
 query_create_temp = f"""
 CREATE GLOBAL TEMPORARY TABLE temp_proc_radiologia (
     CD_ATENDIMENTO NUMBER,
@@ -165,15 +174,8 @@ CREATE GLOBAL TEMPORARY TABLE temp_proc_radiologia (
 ) ON COMMIT PRESERVE ROWS
 """
 
-try:
-    run_sql(query_create_temp)
-    print("✅ Tabela temporária criada no Oracle")
-except Exception as e:
-    # Tabela já existe (normal em re-execuções)
-    if "ORA-00955" in str(e) or "name is already used" in str(e):
-        print("ℹ️  Tabela temporária já existe, será reaproveitada")
-    else:
-        raise e
+run_sql(query_create_temp)
+print("✅ Tabela temporária criada no Oracle")
 
 # Passo 2: Popular tabela temporária
 query_insert_temp = f"""
