@@ -218,6 +218,8 @@ print(f"✅ {total_procedimentos:,} procedimentos realizados encontrados")
 # COMMAND ----------
 
 print("🔍 Extraindo laudos com join otimizado NO ORACLE...")
+print("⏳ Aguarde... O join pode levar alguns minutos dependendo do volume de dados.")
+print(f"📊 Processando {total_procedimentos:,} procedimentos realizados...")
 
 # Query otimizada: JOIN acontece NO ORACLE usando a tabela temporária
 # Busca CD_PACIENTE via TM_ATENDIMENTO
@@ -249,7 +251,23 @@ WHERE LAUP.DS_LAUDO_MEDICO IS NOT NULL
 """
 
 # Executar extração (join acontece no Oracle)
+import time
+inicio_extracao = time.time()
+
+print("\n" + "="*60)
+print("🔄 EXECUTANDO JOIN NO ORACLE...")
+print("="*60)
+print("📍 Etapas:")
+print("   1. Join temp_proc_radiologia ↔ TM_ATENDIMENTO")
+print("   2. Join com TB_PROCEDIMENTO (nomes)")
+print("   3. Join com TB_LAUDO_PACIENTE (laudos)")
+print("   4. Transferência Oracle → Databricks")
+print("="*60 + "\n")
+
 df_laudos_pd = run_sql(query_laudos)
+
+tempo_extracao = time.time() - inicio_extracao
+print(f"\n⏱️  Tempo de extração: {tempo_extracao:.2f} segundos ({tempo_extracao/60:.1f} minutos)")
 
 # Filtrar laudos vazios no pandas (DS_LAUDO_MEDICO é tipo LONG, não pode filtrar no Oracle)
 if len(df_laudos_pd) > 0:
