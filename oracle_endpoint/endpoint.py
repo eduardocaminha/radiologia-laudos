@@ -3,12 +3,14 @@ Databricks Serving Endpoint para queries Oracle Lake
 Roda em cluster com Java e acesso à rede privada Oracle
 """
 
-from flask import Flask, request, jsonify
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
 import jaydebeapi
 import pandas as pd
 import os
+from typing import Optional, List, Dict, Any
 
-app = Flask(__name__)
+app = FastAPI(title="Oracle Lake API", version="1.0.0")
 
 # Configuração Oracle (mesma do Lake.py)
 ORACLE_CONFIG = {
@@ -60,43 +62,46 @@ def get_oracle_connection():
     return _connection
 
 
-@app.route('/health', methods=['GET'])
-def health():
+# Modelos Pydantic
+class QueryRequest(BaseModel):
+    query: str
+
+class TermoRequest(BaseModel):
+    termo: str
+
+class QueryResponse(BaseModel):
+    success: bool
+    data: Optional[List[Dict[str, Any]]] = None
+    columns: Optional[List[str]] = None
+    row_count: Optional[int] = None
+    error: Optional[str] = None
+
+
+@app.get("/health")
+async def health():
     """Health check"""
-    return jsonify({'status': 'healthy'})
+    return {"status": "healthy"}
 
 
-@app.route('/query', methods=['POST'])
-def execute_query():
+@app.post("/query", response_model=QueryResponse)
+async def execute_query(request: QueryRequest):
     """
     Executar query no Oracle Lake
     
     Body JSON:
+    ```json
     {
         "query": "SELECT * FROM RAWZN.RAW_HSP_TB_PROCEDIMENTO WHERE CD_PROCEDIMENTO = 123"
     }
-    
-    Response:
-    {
-        "success": true,
-        "data": [...],
-        "columns": [...],
-        "row_count": 10
-    }
+    ```
     """
     try:
-        # Obter query do request
-        data = request.get_json()
-        query = data.get('query')
+        query = request.query.strip()
         
         if not query:
-            return jsonify({
-                'success': False,
-                'error': 'Query não fornecida'
-            }), 400
+            raise HTTPException(status_code=400, detail="Query não fornecida")
         
         # Limpar query
-        query = query.strip()
         if query.endswith(';'):
             query = query[:-1]
         
@@ -109,28 +114,26 @@ def execute_query():
         # Obter resultados
         columns = [desc[0] for desc in cursor.description]
         rows = cursor.fetchall()
-        
         cursor.close()
         
         # Converter para formato JSON-friendly
         data = [dict(zip(columns, row)) for row in rows]
         
-        return jsonify({
-            'success': True,
-            'data': data,
-            'columns': columns,
-            'row_count': len(data)
-        })
+        return QueryResponse(
+            success=True,
+            data=data,
+            columns=columns,
+            row_count=len(data)
+        )
         
+    except HTTPException:
+        raise
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.route('/procedimento/codigo/<int:cd_procedimento>', methods=['GET'])
-def buscar_por_codigo(cd_procedimento):
+@app.get("/procedimento/codigo/{cd_procedimento}", response_model=QueryResponse)
+async def buscar_por_codigo(cd_procedimento: int):
     """Buscar procedimento por código"""
     query = f"""
     SELECT DISTINCT CD_PROCEDIMENTO, NM_PROCEDIMENTO
@@ -138,41 +141,37 @@ def buscar_por_codigo(cd_procedimento):
     WHERE CD_PROCEDIMENTO = {cd_procedimento}
     """
     
-    return execute_query_internal(query)
+    return await execute_query_internal(query)
 
 
-@app.route('/procedimento/termo', methods=['POST'])
-def buscar_por_termo():
+@app.post("/procedimento/termo", response_model=QueryResponse)
+async def buscar_por_termo(request: TermoRequest):
     """
     Buscar procedimento por termo
     
     Body JSON:
+    ```json
     {
         "termo": "TOMOGRAFIA"
     }
+    ```
     """
-    data = request.get_json()
-    termo = data.get('termo', '')
-    
-    if not termo:
-        return jsonify({
-            'success': False,
-            'error': 'Termo não fornecido'
-        }), 400
+    if not request.termo:
+        raise HTTPException(status_code=400, detail="Termo não fornecido")
     
     query = f"""
     SELECT DISTINCT CD_PROCEDIMENTO, NM_PROCEDIMENTO
     FROM RAWZN.RAW_HSP_TB_PROCEDIMENTO
-    WHERE UPPER(NM_PROCEDIMENTO) LIKE UPPER('%{termo}%')
+    WHERE UPPER(NM_PROCEDIMENTO) LIKE UPPER('%{request.termo}%')
     ORDER BY NM_PROCEDIMENTO
     FETCH FIRST 100 ROWS ONLY
     """
     
-    return execute_query_internal(query)
+    return await execute_query_internal(query)
 
 
-def execute_query_internal(query):
-    """Helper para executar query e retornar JSON"""
+async def execute_query_internal(query: str) -> QueryResponse:
+    """Helper para executar query e retornar resposta"""
     try:
         conn = get_oracle_connection()
         cursor = conn.cursor()
@@ -185,19 +184,17 @@ def execute_query_internal(query):
         
         data = [dict(zip(columns, row)) for row in rows]
         
-        return jsonify({
-            'success': True,
-            'data': data,
-            'columns': columns,
-            'row_count': len(data)
-        })
+        return QueryResponse(
+            success=True,
+            data=data,
+            columns=columns,
+            row_count=len(data)
+        )
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080)
+    import uvicorn
+    uvicorn.run(app, host='0.0.0.0', port=8080)
