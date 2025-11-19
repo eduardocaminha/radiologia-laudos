@@ -196,9 +196,9 @@ run_sql(query_insert_temp)
 print("✅ Tabela temporária populada no Oracle")
 
 # Verificar quantos registros foram inseridos
-query_count = "SELECT COUNT(*) as total FROM temp_proc_radiologia"
+query_count = "SELECT COUNT(*) as TOTAL FROM temp_proc_radiologia"
 df_count = run_sql(query_count)
-total_procedimentos = df_count['total'].iloc[0]
+total_procedimentos = df_count['TOTAL'].iloc[0]
 
 if total_procedimentos == 0:
     print(f"⚠️ Nenhum procedimento realizado encontrado no período {data_inicio} - {data_fim}")
