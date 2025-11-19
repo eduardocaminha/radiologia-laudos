@@ -149,7 +149,8 @@ print("="*70)
 
 for i in range(num_lotes):
     lote_inicio = data_inicio + timedelta(days=i * dias_por_lote)
-    lote_fim = min(lote_inicio + timedelta(days=dias_por_lote), data_fim)
+    lote_fim_calculado = lote_inicio + timedelta(days=dias_por_lote)
+    lote_fim = lote_fim_calculado if lote_fim_calculado < data_fim else data_fim
     
     print(f"\n📦 LOTE {i+1}/{num_lotes}")
     print(f"   Período: {lote_inicio} até {lote_fim}")
