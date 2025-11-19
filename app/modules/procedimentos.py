@@ -5,7 +5,7 @@ Módulo de gerenciamento de Procedimentos
 import streamlit as st
 import pandas as pd
 from config import TABLE_PROCEDIMENTOS, TABLE_MODALIDADES, TABLE_DESCRICOES
-from database import execute_query, execute_command, buscar_procedimento_oracle
+from database import execute_query, execute_command
 
 
 def listar_procedimentos(conn, apenas_ativos=True, id_modalidade=None):
@@ -177,238 +177,78 @@ def renderizar_pagina_procedimentos(conn):
     st.subheader("🔬 Gerenciamento de Procedimentos")
     
     st.info("""
-    ℹ️ **Cadastro de procedimentos:** Todos os procedimentos devem ser validados no Oracle Lake.
-    Use a busca por código ou por termo para encontrar e cadastrar procedimentos.
+    ℹ️ **Gerenciamento de procedimentos:** Visualize, ative/desative procedimentos cadastrados no Delta Lake.
+    Os procedimentos são vinculados a modalidades e descrições.
     """)
     
-    # Tabs para organizar funcionalidades
-    tab_listar, tab_busca_codigo, tab_busca_termo = st.tabs([
-        "📋 Listar",
-        "🔍 Buscar por Código",
-        "🔎 Buscar por Termo"
-    ])
+    # ===== LISTAR PROCEDIMENTOS =====
+    st.markdown("### Procedimentos Cadastrados")
     
-    # ===== TAB: LISTAR =====
-    with tab_listar:
-        st.markdown("### Procedimentos Cadastrados")
-        
-        # Filtros
-        col1, col2, col3 = st.columns([2, 2, 1])
-        
-        with col1:
-            mostrar_inativos = st.checkbox("Mostrar procedimentos inativos", value=False)
-        
-        with col2:
-            df_modalidades = obter_modalidades_ativas(conn)
-            opcoes_modalidades = ["Todas"] + df_modalidades['nome_modalidade'].tolist()
-            filtro_modalidade = st.selectbox("Filtrar por modalidade:", opcoes_modalidades)
-        
-        with col3:
-            if st.button("🔄 Atualizar", key="refresh_procedimentos"):
-                st.rerun()
-        
-        # Determinar filtro de modalidade
-        id_modalidade_filtro = None
-        if filtro_modalidade != "Todas":
-            id_modalidade_filtro = df_modalidades[
-                df_modalidades['nome_modalidade'] == filtro_modalidade
-            ]['id_modalidade'].iloc[0]
-        
-        # Carregar procedimentos
-        df_procedimentos = listar_procedimentos(
-            conn,
-            apenas_ativos=not mostrar_inativos,
-            id_modalidade=id_modalidade_filtro
-        )
-        
-        if len(df_procedimentos) == 0:
-            st.info("ℹ️ Nenhum procedimento encontrado.")
-        else:
-            st.markdown(f"**Total:** {len(df_procedimentos)} procedimento(s)")
-            
-            # Exibir procedimentos
-            for idx, row in df_procedimentos.iterrows():
-                with st.expander(f"{'✅' if row['ativo'] else '❌'} {row['cd_procedimento']} - {row['nm_procedimento']}"):
-                    col1, col2 = st.columns([3, 1])
-                    
-                    with col1:
-                        st.markdown(f"**Modalidade:** {row['nome_modalidade']}")
-                        st.markdown(f"**Código:** {row['cd_procedimento']}")
-                        st.markdown(f"**Cadastro:** {row['dt_cadastro']}")
-                        
-                        # Descrições
-                        descricoes = []
-                        for i in range(1, 8):
-                            desc = row[f'descricao_{i}']
-                            if pd.notna(desc) and desc:
-                                descricoes.append(desc)
-                        
-                        if descricoes:
-                            st.markdown("**Descrições:**")
-                            for desc in descricoes:
-                                st.markdown(f"- {desc}")
-                        else:
-                            st.caption("_Sem descrições_")
-                    
-                    with col2:
-                        # Botão Ativar/Desativar
-                        if row['ativo']:
-                            if st.button("🚫 Desativar", key=f"deactivate_proc_{row['cd_procedimento']}"):
-                                alternar_status_procedimento(conn, row['cd_procedimento'], False)
-                                st.rerun()
-                        else:
-                            if st.button("✅ Ativar", key=f"activate_proc_{row['cd_procedimento']}"):
-                                alternar_status_procedimento(conn, row['cd_procedimento'], True)
-                                st.rerun()
+    # Filtros
+    col1, col2, col3 = st.columns([2, 2, 1])
     
-    # ===== TAB: BUSCA POR CÓDIGO =====
-    with tab_busca_codigo:
-        st.markdown("### Buscar Procedimento por Código no Oracle Lake")
+    with col1:
+        mostrar_inativos = st.checkbox("Mostrar procedimentos inativos", value=False)
+    
+    with col2:
+        df_modalidades = obter_modalidades_ativas(conn)
+        opcoes_modalidades = ["Todas"] + df_modalidades['nome_modalidade'].tolist()
+        filtro_modalidade = st.selectbox("Filtrar por modalidade:", opcoes_modalidades)
+    
+    with col3:
+        if st.button("🔄 Atualizar", key="refresh_procedimentos"):
+            st.rerun()
+    
+    # Determinar filtro de modalidade
+    id_modalidade_filtro = None
+    if filtro_modalidade != "Todas":
+        id_modalidade_filtro = df_modalidades[
+            df_modalidades['nome_modalidade'] == filtro_modalidade
+        ]['id_modalidade'].iloc[0]
+    
+    # Carregar procedimentos
+    df_procedimentos = listar_procedimentos(
+        conn,
+        apenas_ativos=not mostrar_inativos,
+        id_modalidade=id_modalidade_filtro
+    )
+    
+    if len(df_procedimentos) == 0:
+        st.info("ℹ️ Nenhum procedimento encontrado.")
+    else:
+        st.markdown(f"**Total:** {len(df_procedimentos)} procedimento(s)")
         
-        cd_busca = st.number_input(
-            "Digite o código do procedimento:",
-            min_value=1,
-            step=1,
-            key="cd_busca_oracle"
-        )
-        
-        if st.button("🔍 Buscar no Oracle", key="btn_buscar_codigo"):
-            with st.spinner("Buscando no Oracle Lake..."):
-                df_resultado = buscar_procedimento_oracle(cd_procedimento=cd_busca)
-            
-            if len(df_resultado) == 0:
-                st.warning(f"⚠️ Procedimento {cd_busca} não encontrado no Oracle Lake")
-            else:
-                st.success(f"✅ Procedimento encontrado!")
+        # Exibir procedimentos
+        for idx, row in df_procedimentos.iterrows():
+            with st.expander(f"{'✅' if row['ativo'] else '❌'} {row['cd_procedimento']} - {row['nm_procedimento']}"):
+                col1, col2 = st.columns([3, 1])
                 
-                proc = df_resultado.iloc[0]
-                st.markdown(f"**Código:** {proc['CD_PROCEDIMENTO']}")
-                st.markdown(f"**Nome:** {proc['NM_PROCEDIMENTO']}")
+                with col1:
+                    st.markdown(f"**Modalidade:** {row['nome_modalidade']}")
+                    st.markdown(f"**Código:** {row['cd_procedimento']}")
+                    st.markdown(f"**Cadastro:** {row['dt_cadastro']}")
+                    
+                    # Descrições
+                    descricoes = []
+                    for i in range(1, 8):
+                        desc = row[f'descricao_{i}']
+                        if pd.notna(desc) and desc:
+                            descricoes.append(desc)
+                    
+                    if descricoes:
+                        st.markdown("**Descrições:**")
+                        for desc in descricoes:
+                            st.markdown(f"- {desc}")
+                    else:
+                        st.caption("_Sem descrições_")
                 
-                # Formulário para adicionar
-                with st.form("form_adicionar_oracle_codigo"):
-                    df_modalidades = obter_modalidades_ativas(conn)
-                    modalidade_selecionada = st.selectbox(
-                        "Selecione a Modalidade:",
-                        options=df_modalidades['nome_modalidade'].tolist()
-                    )
-                    
-                    # Multiselect para descrições
-                    df_descricoes = obter_descricoes_ativas(conn)
-                    descricoes_selecionadas = []
-                    if len(df_descricoes) > 0:
-                        descricoes_selecionadas = st.multiselect(
-                            "Descrições (selecione até 7):",
-                            options=df_descricoes['descricao'].tolist(),
-                            max_selections=7,
-                            key="desc_oracle_codigo"
-                        )
-                    
-                    if st.form_submit_button("➕ Adicionar ao Delta Lake"):
-                        id_modalidade = df_modalidades[
-                            df_modalidades['nome_modalidade'] == modalidade_selecionada
-                        ]['id_modalidade'].iloc[0]
-                        
-                        # Converter descrições para IDs
-                        ids_descricoes = []
-                        if len(df_descricoes) > 0:
-                            for desc in descricoes_selecionadas:
-                                id_desc = df_descricoes[df_descricoes['descricao'] == desc]['id_descricao'].iloc[0]
-                                ids_descricoes.append(id_desc)
-                        
-                        if adicionar_procedimento(
-                            conn,
-                            int(proc['CD_PROCEDIMENTO']),
-                            proc['NM_PROCEDIMENTO'],
-                            id_modalidade,
-                            ids_descricoes
-                        ):
+                with col2:
+                    # Botão Ativar/Desativar
+                    if row['ativo']:
+                        if st.button("🚫 Desativar", key=f"deactivate_proc_{row['cd_procedimento']}"):
+                            alternar_status_procedimento(conn, row['cd_procedimento'], False)
                             st.rerun()
-    
-    # ===== TAB: BUSCA POR TERMO =====
-    with tab_busca_termo:
-        st.markdown("### Buscar Procedimentos por Termo no Oracle Lake")
-        
-        termo_busca = st.text_input(
-            "Digite o termo de busca:",
-            placeholder="Ex: TOMOGRAFIA, ANGIOTC, ABDOME",
-            key="termo_busca_oracle"
-        )
-        
-        if st.button("🔎 Buscar no Oracle", key="btn_buscar_termo"):
-            if termo_busca.strip():
-                with st.spinner("Buscando no Oracle Lake..."):
-                    df_resultados = buscar_procedimento_oracle(termo_busca=termo_busca.strip())
-                
-                if len(df_resultados) == 0:
-                    st.warning(f"⚠️ Nenhum procedimento encontrado com o termo '{termo_busca}'")
-                else:
-                    st.success(f"✅ {len(df_resultados)} procedimento(s) encontrado(s)")
-                    st.session_state['resultados_busca_termo'] = df_resultados
-            else:
-                st.error("❌ Digite um termo para buscar")
-        
-        # Exibir resultados e permitir seleção
-        if 'resultados_busca_termo' in st.session_state:
-            df_resultados = st.session_state['resultados_busca_termo']
-            
-            st.markdown("---")
-            st.markdown("### Selecione os procedimentos para adicionar:")
-            
-            # Checkboxes para seleção
-            selecionados = []
-            for idx, row in df_resultados.iterrows():
-                if st.checkbox(
-                    f"{row['CD_PROCEDIMENTO']} - {row['NM_PROCEDIMENTO']}",
-                    key=f"check_proc_{row['CD_PROCEDIMENTO']}"
-                ):
-                    selecionados.append(row)
-            
-            if selecionados:
-                st.markdown(f"**{len(selecionados)} procedimento(s) selecionado(s)**")
-                
-                # Formulário para adicionar em lote
-                with st.form("form_adicionar_oracle_termo"):
-                    df_modalidades = obter_modalidades_ativas(conn)
-                    modalidade_selecionada = st.selectbox(
-                        "Modalidade para todos os selecionados:",
-                        options=df_modalidades['nome_modalidade'].tolist()
-                    )
-                    
-                    # Multiselect para descrições
-                    df_descricoes = obter_descricoes_ativas(conn)
-                    descricoes_selecionadas = []
-                    if len(df_descricoes) > 0:
-                        descricoes_selecionadas = st.multiselect(
-                            "Descrições (aplicadas a todos, até 7):",
-                            options=df_descricoes['descricao'].tolist(),
-                            max_selections=7,
-                            key="desc_oracle_termo"
-                        )
-                    
-                    if st.form_submit_button("➕ Adicionar Selecionados ao Delta Lake"):
-                        id_modalidade = df_modalidades[
-                            df_modalidades['nome_modalidade'] == modalidade_selecionada
-                        ]['id_modalidade'].iloc[0]
-                        
-                        # Converter descrições para IDs
-                        ids_descricoes = []
-                        if len(df_descricoes) > 0:
-                            for desc in descricoes_selecionadas:
-                                id_desc = df_descricoes[df_descricoes['descricao'] == desc]['id_descricao'].iloc[0]
-                                ids_descricoes.append(id_desc)
-                        
-                        sucesso = 0
-                        for proc in selecionados:
-                            if adicionar_procedimento(
-                                conn,
-                                int(proc['CD_PROCEDIMENTO']),
-                                proc['NM_PROCEDIMENTO'],
-                                id_modalidade,
-                                ids_descricoes
-                            ):
-                                sucesso += 1
-                        
-                        st.success(f"✅ {sucesso}/{len(selecionados)} procedimento(s) adicionado(s) com sucesso!")
-                        del st.session_state['resultados_busca_termo']
-                        st.rerun()
+                    else:
+                        if st.button("✅ Ativar", key=f"activate_proc_{row['cd_procedimento']}"):
+                            alternar_status_procedimento(conn, row['cd_procedimento'], True)
+                            st.rerun()

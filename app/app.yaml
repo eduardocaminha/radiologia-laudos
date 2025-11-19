@@ -3,5 +3,3 @@ command: ['streamlit', 'run', 'app.py']
 env:
   - name: 'DATABRICKS_HTTP_PATH'
     value: '/sql/1.0/warehouses/784d0df97cfe75af'
-  - name: 'ORACLE_PASSWORD'
-    value: 'COLE_A_SENHA_AQUI'  # TEMPORÁRIO: Substitua pela senha real
