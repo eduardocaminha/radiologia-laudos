@@ -354,6 +354,159 @@ Após a camada Bronze estar populada:
 3. **ML Pipeline**: Extração de entidades (NER) dos laudos
 4. **Dashboards**: Visualizações e análises
 
+---
+
+# 🔄 Reprocessamento Histórico
+
+Para processar laudos de períodos anteriores, use o notebook **`reprocessamento_historico.py`**.
+
+## 📋 Quando Usar
+
+- ✅ **Carga inicial histórica** (ex: processar últimos 6 meses)
+- ✅ **Reprocessamento após correções** (ex: bug corrigido, reprocessar dados)
+- ✅ **Períodos específicos** (ex: processar apenas Janeiro/2025)
+- ✅ **Recuperação de falhas** (ex: job diário falhou por 1 semana)
+
+## 🚀 Como Usar
+
+### 1. Configurar Parâmetros
+
+```python
+data_inicio: 2024-06-01      # Data inicial (YYYY-MM-DD)
+data_fim: 2024-12-31         # Data final (YYYY-MM-DD)
+tamanho_lote: 7              # Dias por lote (7, 14 ou 30)
+modo_teste: false            # true = apenas conta, false = processa
+```
+
+### 2. Executar
+
+**Via UI Databricks:**
+1. Abra o notebook `reprocessamento_historico`
+2. Configure os widgets no topo
+3. Run All
+
+**Via CLI:**
+```bash
+databricks jobs run-now --job-id <JOB_ID> \
+  --notebook-params '{
+    "data_inicio":"2024-06-01",
+    "data_fim":"2024-12-31",
+    "tamanho_lote":"7",
+    "modo_teste":"false"
+  }'
+```
+
+## 📊 Exemplos
+
+### Exemplo 1: Carga Inicial (6 meses)
+```python
+data_inicio: 2024-06-01
+data_fim: 2024-12-01
+tamanho_lote: 7        # ~26 lotes de 1 semana
+modo_teste: false
+```
+
+**Resultado:** ~26 lotes, 30-60 minutos
+
+### Exemplo 2: Teste Antes de Processar
+```python
+data_inicio: 2024-06-01
+data_fim: 2024-12-01
+tamanho_lote: 7
+modo_teste: true       # ← Apenas mostra estatísticas
+```
+
+## ⚙️ Tamanho de Lote Recomendado
+
+| Período Total | Tamanho Lote | Nº Lotes | Tempo Estimado |
+|---------------|--------------|----------|----------------|
+| 1 mês | 7 dias | ~4 | 5-10 min |
+| 3 meses | 7 dias | ~13 | 15-30 min |
+| 6 meses | 7 dias | ~26 | 30-60 min |
+| 1 ano | 14 dias | ~26 | 30-60 min |
+
+## 🎯 Por Que Lotes?
+
+**✅ Com Lotes:**
+- Processamento controlado
+- Recuperação de erros (continua do lote que falhou)
+- Progresso visível
+- Não sobrecarrega Oracle
+
+**❌ Sem Lotes:**
+- Timeout do Oracle
+- Memória insuficiente
+- Difícil recuperar de erros
+
+## 🛡️ Segurança
+
+- ✅ **Merge inteligente**: Não cria duplicatas
+- ✅ **Idempotente**: Pode reprocessar o mesmo período
+- ✅ **Modo teste**: Valida antes de processar
+
+---
+
+# 🚀 Quick Start
+
+## Setup Inicial (Uma Vez)
+
+1. **Executar setup:**
+   ```python
+   %run /Workspace/Repos/radiologia-laudos/jobs/setup_inicial
+   ```
+
+2. **Criar job no Databricks:**
+   - Via UI: Jobs → Create Job
+   - Via CLI: `databricks jobs create --json-file jobs/job_config.yaml`
+
+3. **Configurar widgets (deixar vazios para automático):**
+   - `data_processamento`: *vazio* (calcula D-1)
+   - `modo_execucao`: `incremental`
+   - `dias_retroativos`: `1`
+
+## Teste Manual
+
+```python
+# Configure os widgets:
+data_processamento: 2025-11-18  # Dia específico
+modo_execucao: incremental
+dias_retroativos: 1
+
+# Execute o notebook
+```
+
+## Verificação
+
+```sql
+-- Ver dados extraídos
+SELECT * 
+FROM innovation_dev.bronze.radiologia_laudos_extraidos
+WHERE dt_processamento = '2025-11-18'
+LIMIT 10;
+
+-- Ver métricas
+SELECT * 
+FROM innovation_dev.bronze.radiologia_laudos_metricas_job
+ORDER BY dt_execucao DESC
+LIMIT 5;
+
+-- Verificar duplicatas (deve estar vazio!)
+SELECT * 
+FROM innovation_dev.bronze.vw_radiologia_laudos_duplicatas;
+```
+
+## ✅ Checklist
+
+- [ ] Setup inicial executado
+- [ ] Job criado no Databricks
+- [ ] Teste manual funcionou
+- [ ] Dados aparecem no Bronze
+- [ ] Métricas salvas
+- [ ] Sem duplicatas
+- [ ] Schedule ativado (se quiser automático)
+
+---
+
 ## 📞 Suporte
 
 **Dúvidas ou problemas:**
