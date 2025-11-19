@@ -175,17 +175,17 @@ if len(df_procedimentos_realizados) == 0:
 
 print(f"✅ {len(df_procedimentos_realizados):,} procedimentos realizados encontrados")
 
+# Estatísticas do pandas DataFrame
+print("\n📊 Estatísticas da extração:")
+print(f"   - Registros: {len(df_procedimentos_realizados):,}")
+print(f"   - Atendimentos únicos: {df_procedimentos_realizados['CD_ATENDIMENTO'].nunique():,}")
+print(f"   - Pacientes únicos: {df_procedimentos_realizados['CD_PACIENTE'].nunique():,}")
+
 # Converter para Spark DataFrame para otimizações
 df_proc_spark = spark.createDataFrame(df_procedimentos_realizados)
 
 # Criar view temporária
 df_proc_spark.createOrReplaceTempView("temp_procedimentos_realizados")
-
-# Estatísticas
-print("\n📊 Estatísticas da tabela temporária:")
-print(f"   - Registros: {df_proc_spark.count():,}")
-print(f"   - Atendimentos únicos: {df_proc_spark.select('CD_ATENDIMENTO').distinct().count():,}")
-print(f"   - Pacientes únicos: {df_proc_spark.select('CD_PACIENTE').distinct().count():,}")
 
 # Cache para otimizar joins
 df_proc_spark.cache()
