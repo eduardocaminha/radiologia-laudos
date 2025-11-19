@@ -16,12 +16,12 @@ Alimentar diariamente uma tabela Bronze no Delta Lake com laudos de exames radio
 
 ### Dados
 - **Origem**: Oracle Lake (RAWZN)
-  - `RAW_HSP_TB_PROCEDIMENTO_REALIZADO`
-  - `RAW_HSP_TB_LAUDO_PACIENTE`
-  - `RAW_HSP_TB_PROCEDIMENTO`
+  - `RAW_HSP_TB_PROCEDIMENTO_REALIZADO` (procedimentos realizados)
+  - `RAW_HSP_TM_ATENDIMENTO` (dados do paciente)
+  - `RAW_HSP_TB_LAUDO_PACIENTE` (laudos)
 - **Destino**: Delta Lake Bronze
   - `innovation_dev.bronze.radiologia_laudos_extraidos`
-  - Particionado por `ANO_MES` (YYYY-MM)
+  - Particionado por `ano_mes` (YYYY-MM)
 
 ### Procedimentos
 - Lista dinâmica obtida do Gold: `radiologia_laudos_procedimentos`
@@ -40,8 +40,10 @@ Alimentar diariamente uma tabela Bronze no Delta Lake com laudos de exames radio
 ┌─────────────────────────────────────────────────────────────┐
 │  JOB DATABRICKS (02:00 AM)                                  │
 │  ├─ 1. Buscar procedimentos ativos (Gold)                  │
-│  ├─ 2. Criar tabela temp com filtros (Oracle)              │
-│  ├─ 3. Join otimizado com tb_laudo_paciente                │
+│  ├─ 2. Criar tabela temp no Oracle (filtrada)              │
+│  ├─ 3. Join no Oracle:                                     │
+│  │     • temp ↔ TM_ATENDIMENTO (cd_paciente)               │
+│  │     • temp ↔ TB_LAUDO_PACIENTE (laudos)                 │
 │  └─ 4. Salvar em Bronze (Delta Lake)                       │
 └─────────────────────────────────────────────────────────────┘
                             ↓
@@ -112,7 +114,6 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
     accession_number STRING NOT NULL,  -- Chave única
     cd_procedimento BIGINT,
     cd_paciente BIGINT,
-    nm_procedimento STRING,
     ds_laudo_medico STRING,
     dt_procedimento_realizado DATE,
     ano INT,
