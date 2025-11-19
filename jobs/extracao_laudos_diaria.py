@@ -221,6 +221,7 @@ print("🔍 Extraindo laudos com join otimizado NO ORACLE...")
 
 # Query otimizada: JOIN acontece NO ORACLE usando a tabela temporária
 # Busca CD_PACIENTE via TM_ATENDIMENTO
+# Nota: DS_LAUDO_MEDICO é tipo LONG, não pode usar funções no WHERE
 query_laudos = f"""
 SELECT /*+ PARALLEL(8) */
     temp.CD_ATENDIMENTO,
@@ -245,11 +246,18 @@ INNER JOIN RAWZN.RAW_HSP_TB_LAUDO_PACIENTE LAUP
     AND temp.CD_OCORRENCIA = LAUP.CD_OCORRENCIA
     AND temp.CD_ORDEM = LAUP.CD_ORDEM
 WHERE LAUP.DS_LAUDO_MEDICO IS NOT NULL
-  AND DBMS_LOB.GETLENGTH(LAUP.DS_LAUDO_MEDICO) > 0
 """
 
 # Executar extração (join acontece no Oracle)
 df_laudos_pd = run_sql(query_laudos)
+
+# Filtrar laudos vazios no pandas (DS_LAUDO_MEDICO é tipo LONG, não pode filtrar no Oracle)
+if len(df_laudos_pd) > 0:
+    count_antes_filtro = len(df_laudos_pd)
+    df_laudos_pd = df_laudos_pd[df_laudos_pd['DS_LAUDO_MEDICO'].astype(str).str.strip().str.len() > 0]
+    count_depois_filtro = len(df_laudos_pd)
+    if count_antes_filtro > count_depois_filtro:
+        print(f"🧹 Removidos {count_antes_filtro - count_depois_filtro} laudos vazios")
 
 if len(df_laudos_pd) == 0:
     print(f"⚠️ Nenhum laudo encontrado para o período {data_inicio} - {data_fim}")
