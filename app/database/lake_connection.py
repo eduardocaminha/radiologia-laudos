@@ -58,18 +58,6 @@ def init_lake_connection():
     global _lake_connection
     
     try:
-        # Instalar JDK automaticamente se necessário
-        try:
-            import jdk
-            if not os.environ.get('JAVA_HOME'):
-                with st.spinner("Instalando Java JDK..."):
-                    java_home = jdk.install('17')
-                    os.environ['JAVA_HOME'] = java_home
-                    os.environ['PATH'] = f"{java_home}/bin:{os.environ.get('PATH', '')}"
-                    st.info(f"✅ Java instalado em: {java_home}")
-        except Exception as e:
-            st.warning(f"⚠️ Não foi possível instalar Java automaticamente: {str(e)}")
-        
         # Importar JayDeBeAPI
         try:
             import jaydebeapi

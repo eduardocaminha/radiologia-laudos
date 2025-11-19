@@ -1,6 +1,3 @@
-# Databricks
-*.jar
-ojdbc*.jar
 
 # Python
 __pycache__/
