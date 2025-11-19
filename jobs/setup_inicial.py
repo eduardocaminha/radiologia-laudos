@@ -60,7 +60,6 @@ schema_laudos = StructType([
     StructField("accession_number", StringType(), False),  # Chave única
     StructField("cd_procedimento", LongType(), False),
     StructField("cd_paciente", LongType(), True),
-    StructField("nm_procedimento", StringType(), True),
     StructField("ds_laudo_medico", StringType(), True),
     StructField("dt_procedimento_realizado", DateType(), True),
     StructField("ano", IntegerType(), True),

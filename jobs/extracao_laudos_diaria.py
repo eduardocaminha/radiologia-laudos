@@ -232,7 +232,6 @@ SELECT /*+ PARALLEL(8) */
     TO_CHAR(temp.CD_ATENDIMENTO) || TO_CHAR(temp.CD_OCORRENCIA) || TO_CHAR(temp.CD_ORDEM) as ACCESSION_NUMBER,
     temp.CD_PROCEDIMENTO,
     ATD.CD_PACIENTE,
-    P.NM_PROCEDIMENTO,
     LAUP.DS_LAUDO_MEDICO,
     temp.DT_PROCEDIMENTO_REALIZADO,
     EXTRACT(YEAR FROM temp.DT_PROCEDIMENTO_REALIZADO) as ANO,
@@ -241,8 +240,6 @@ SELECT /*+ PARALLEL(8) */
 FROM temp_proc_radiologia temp
 INNER JOIN RAWZN.RAW_HSP_TM_ATENDIMENTO ATD
     ON temp.CD_ATENDIMENTO = ATD.CD_ATENDIMENTO
-INNER JOIN RAWZN.RAW_HSP_TB_PROCEDIMENTO P
-    ON temp.CD_PROCEDIMENTO = P.CD_PROCEDIMENTO
 INNER JOIN RAWZN.RAW_HSP_TB_LAUDO_PACIENTE LAUP
     ON temp.CD_ATENDIMENTO = LAUP.CD_ATENDIMENTO
     AND temp.CD_OCORRENCIA = LAUP.CD_OCORRENCIA
@@ -258,10 +255,9 @@ print("\n" + "="*60)
 print("🔄 EXECUTANDO JOIN NO ORACLE...")
 print("="*60)
 print("📍 Etapas:")
-print("   1. Join temp_proc_radiologia ↔ TM_ATENDIMENTO")
-print("   2. Join com TB_PROCEDIMENTO (nomes)")
-print("   3. Join com TB_LAUDO_PACIENTE (laudos)")
-print("   4. Transferência Oracle → Databricks")
+print("   1. Join temp_proc_radiologia ↔ TM_ATENDIMENTO (CD_PACIENTE)")
+print("   2. Join com TB_LAUDO_PACIENTE (laudos)")
+print("   3. Transferência Oracle → Databricks")
 print("="*60 + "\n")
 
 df_laudos_pd = run_sql(query_laudos)
@@ -410,10 +406,10 @@ metricas = {
     'periodo_inicio': str(data_inicio),
     'periodo_fim': str(data_fim),
     'modo_execucao': modo_execucao,
-    'procedimentos_ativos': len(lista_codigos),
-    'procedimentos_realizados': total_procedimentos,
-    'laudos_extraidos': count_depois,  # Após remoção de duplicatas
-    'total_bronze': total_bronze,
+    'procedimentos_ativos': int(len(lista_codigos)),
+    'procedimentos_realizados': int(total_procedimentos),
+    'laudos_extraidos': int(count_depois),  # Após remoção de duplicatas
+    'total_bronze': int(total_bronze),
     'dt_execucao': datetime.now().isoformat()
 }
 
