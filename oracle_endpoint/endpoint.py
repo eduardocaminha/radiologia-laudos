@@ -197,4 +197,5 @@ async def execute_query_internal(query: str) -> QueryResponse:
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8080)
+    # Porta 443 (HTTPS) - mesma que o cluster expõe
+    uvicorn.run(app, host='0.0.0.0', port=443)
