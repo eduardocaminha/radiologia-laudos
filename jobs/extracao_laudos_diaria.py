@@ -308,9 +308,9 @@ print(f"   - Procedimentos distintos: {df_laudos.select('cd_procedimento').disti
 print(f"   - Pacientes distintos: {df_laudos.select('cd_paciente').distinct().count():,}")
 print(f"   - Período: {df_laudos.agg(min('dt_procedimento_realizado'), max('dt_procedimento_realizado')).collect()[0]}")
 
-# Distribuição por modalidade
+# Distribuição por procedimento
 print("\n📋 Distribuição por procedimento (Top 10):")
-df_laudos.groupBy('cd_procedimento', 'nm_procedimento') \
+df_laudos.groupBy('cd_procedimento') \
     .count() \
     .orderBy(desc('count')) \
     .show(10, truncate=False)
