@@ -26,10 +26,19 @@ def get_oracle_connection():
     global _connection
     
     if _connection is None:
-        # Obter senha do dbutils
-        from pyspark.sql import SparkSession
-        spark = SparkSession.builder.getOrCreate()
-        password = spark.conf.get("spark.oracle.password")
+        # Obter senha do dbutils.secrets (mesma forma que nos notebooks)
+        try:
+            from pyspark.dbutils import DBUtils
+            from pyspark.sql import SparkSession
+            spark = SparkSession.builder.getOrCreate()
+            dbutils = DBUtils(spark)
+            password = dbutils.secrets.get(scope="INNOVATION_RAW", key="USR_PROD_INFORMATICA_SAUDE")
+        except:
+            # Fallback: tentar do ambiente
+            import os
+            password = os.environ.get("ORACLE_PASSWORD")
+            if not password:
+                raise Exception("Senha Oracle não encontrada (dbutils.secrets ou ORACLE_PASSWORD)")
         
         # Conectar
         _connection = jaydebeapi.connect(
