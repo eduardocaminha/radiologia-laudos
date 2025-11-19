@@ -93,9 +93,17 @@ if modo_teste:
 
 # COMMAND ----------
 
-print("🔌 Conectando ao Oracle Lake...")
-connect_to_datalake()
-print("✅ Conexão estabelecida!")
+print("🔌 Conectando ao Oracle Lake (RAWZN)...")
+
+connect_to_datalake(
+    username="USR_PROD_INFORMATICA_SAUDE",
+    password=dbutils.secrets.get(scope="INNOVATION_RAW", key="USR_PROD_INFORMATICA_SAUDE"),
+    layer="RAWZN",
+    level="LOW",
+    dbx_secret_scope="INNOVATION_RAW"
+)
+
+print("✅ Conexão estabelecida com sucesso!")
 
 # COMMAND ----------
 
