@@ -8,5 +8,19 @@ __pycache__/
 venv/
 ENV/
 
+# Databricks
+*.jar
+ojdbc*.jar
+
 # Streamlit
 .streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

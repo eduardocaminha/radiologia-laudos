@@ -59,8 +59,8 @@ O app tenta carregar automaticamente `../procedimentos.csv`. Caso o arquivo este
 # Instalar dependências
 %pip install -r /Workspace/Repos/radiologia-laudos/oracle_endpoint/requirements.txt
 
-# Iniciar endpoint
-%run /Workspace/Repos/radiologia-laudos/oracle_endpoint/endpoint.py
+# Iniciar endpoint (FastAPI com Uvicorn)
+!uvicorn endpoint:app --host 0.0.0.0 --port 8080 --reload
 ```
 
 **Pré-requisitos do cluster:**
@@ -80,11 +80,15 @@ env:
 
 #### 2.3. Endpoints disponíveis
 
+**Documentação interativa (FastAPI):**
+- Swagger UI: `http://endpoint:8080/docs`
+- ReDoc: `http://endpoint:8080/redoc`
+
 | Método | Path | Descrição |
 |--------|------|-----------|
 | GET | `/health` | Health check |
 | POST | `/query` | Query SQL customizada |
-| GET | `/procedimento/codigo/<cd>` | Buscar por código |
+| GET | `/procedimento/codigo/{cd}` | Buscar por código |
 | POST | `/procedimento/termo` | Buscar por termo |
 
 **Exemplo de uso:**
