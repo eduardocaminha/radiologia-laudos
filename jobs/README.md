@@ -1,0 +1,361 @@
+# Job: Extração Diária de Laudos Radiológicos
+
+Job Databricks para extração automatizada de laudos de procedimentos radiológicos do Oracle Lake (RAWZN) para Delta Lake (Bronze).
+
+## 🎯 Objetivo
+
+Alimentar diariamente uma tabela Bronze no Delta Lake com laudos de exames radiológicos, permitindo análises e processamentos posteriores (Silver/Gold).
+
+## 📋 Características
+
+### Processamento
+- ✅ **Batch diário**: Execução automática às 02:00 AM
+- ✅ **Incremental**: Processa apenas D-1 (dia anterior)
+- ✅ **Idempotente**: Suporta reprocessamento sem duplicatas
+- ✅ **Otimizado**: Tabela temporária + índices para joins eficientes
+
+### Dados
+- **Origem**: Oracle Lake (RAWZN)
+  - `RAW_HSP_TB_PROCEDIMENTO_REALIZADO`
+  - `RAW_HSP_TB_LAUDO_PACIENTE`
+  - `RAW_HSP_TB_PROCEDIMENTO`
+- **Destino**: Delta Lake Bronze
+  - `innovation_dev.bronze.radiologia_laudos_extraidos`
+  - Particionado por `ANO_MES` (YYYY-MM)
+
+### Procedimentos
+- Lista dinâmica obtida do Gold: `radiologia_laudos_procedimentos`
+- Apenas procedimentos **ativos** são processados
+- Gerenciamento via aplicação Streamlit
+
+## 🏗️ Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  GOLD (Delta Lake)                                          │
+│  ├─ radiologia_laudos_procedimentos (lista de códigos)     │
+│  └─ radiologia_laudos_modalidades                          │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  JOB DATABRICKS (02:00 AM)                                  │
+│  ├─ 1. Buscar procedimentos ativos (Gold)                  │
+│  ├─ 2. Criar tabela temp com filtros (Oracle)              │
+│  ├─ 3. Join otimizado com tb_laudo_paciente                │
+│  └─ 4. Salvar em Bronze (Delta Lake)                       │
+└─────────────────────────────────────────────────────────────┘
+                            ↓
+┌─────────────────────────────────────────────────────────────┐
+│  BRONZE (Delta Lake)                                        │
+│  └─ radiologia_laudos_extraidos                            │
+│     ├─ Particionado por ANO_MES                            │
+│     ├─ Otimizado (OPTIMIZE + Z-ORDER)                      │
+│     └─ Histórico completo                                  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 🚀 Setup
+
+### 1. Upload do Notebook
+
+```bash
+# Via Databricks CLI
+databricks workspace import \
+  --language PYTHON \
+  --file jobs/extracao_laudos_diaria.py \
+  /Workspace/Repos/radiologia-laudos/jobs/extracao_laudos_diaria
+```
+
+Ou via UI:
+- Workspace → Repos → radiologia-laudos → jobs
+- Upload `extracao_laudos_diaria.py`
+
+### 2. Criar Job via UI
+
+1. **Jobs → Create Job**
+2. **Nome**: `radiologia_extracao_laudos_diaria`
+3. **Task**:
+   - Type: Notebook
+   - Path: `/Workspace/Repos/radiologia-laudos/jobs/extracao_laudos_diaria`
+4. **Cluster**:
+   - Spark Version: `13.3.x-scala2.12`
+   - Workers: `2` (ajustar conforme volume)
+   - Node Type: `Standard_DS3_v2` ou similar
+5. **Schedule**:
+   - Cron: `0 0 2 * * ?`
+   - Timezone: `America/Sao_Paulo`
+6. **Notifications**:
+   - On Failure: `seu-email@hapvida.com.br`
+
+### 3. Criar Job via CLI (Recomendado)
+
+```bash
+# Usando o arquivo de configuração
+databricks jobs create --json-file jobs/job_config.yaml
+```
+
+### 4. Pré-requisitos do Cluster
+
+✅ **Java instalado** (para JDBC Oracle)  
+✅ **Driver JDBC**: `/Workspace/Libraries/DatalakeConnector/ojdbc11.jar`  
+✅ **Acesso ao Oracle Lake** (rede privada: 10.20.1.79)  
+✅ **Secrets configurados**: `INNOVATION_RAW/USR_PROD_INFORMATICA_SAUDE`  
+✅ **Biblioteca Lake**: `/Workspace/Libraries/Lake`
+
+## 📊 Schema da Tabela Bronze
+
+```sql
+CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
+    cd_atendimento BIGINT,
+    cd_ocorrencia BIGINT,
+    cd_ordem BIGINT,
+    accession_number STRING NOT NULL,  -- Chave única
+    cd_procedimento BIGINT,
+    cd_paciente BIGINT,
+    nm_procedimento STRING,
+    ds_laudo_medico STRING,
+    dt_procedimento_realizado DATE,
+    ano INT,
+    mes INT,
+    ano_mes STRING,
+    dt_carga TIMESTAMP,
+    dt_processamento STRING,
+    modo_execucao STRING
+)
+PARTITIONED BY (ano_mes)
+USING DELTA
+```
+
+### Colunas Principais
+
+- **`accession_number`**: Chave única = `cd_atendimento + cd_ocorrencia + cd_ordem` (sem separadores)
+  - Garante unicidade dos laudos
+  - Usado no MERGE para evitar duplicatas
+  - Indexado via Z-ORDER para performance
+
+> **📌 Padrão de nomenclatura:** Todas as colunas em **minúsculo** (padrão Delta Lake)
+
+### Colunas de Controle
+
+- `dt_carga`: Timestamp da carga no Delta Lake
+- `dt_processamento`: Data de referência do processamento (D-1)
+- `modo_execucao`: `incremental` ou `reprocessamento`
+
+### Controle de Duplicidades
+
+✅ **Deduplicação em múltiplas camadas:**
+1. Query Oracle: `DISTINCT` na extração
+2. Spark DataFrame: `dropDuplicates(['accession_number'])`
+3. Delta Lake: `MERGE` usando `accession_number` como chave
+4. View de monitoramento: `vw_radiologia_laudos_duplicatas`
+
+## 🎮 Execução
+
+### Execução Automática (Diária)
+
+O job roda automaticamente às **02:00 AM** (horário de Brasília) processando o dia anterior (D-1).
+
+### Execução Manual
+
+#### Via UI
+1. Jobs → `radiologia_extracao_laudos_diaria`
+2. Run Now
+3. (Opcional) Sobrescrever parâmetros:
+   - `data_processamento`: `2024-01-15`
+   - `modo_execucao`: `reprocessamento`
+   - `dias_retroativos`: `7`
+
+#### Via CLI
+```bash
+# Execução padrão (D-1)
+databricks jobs run-now --job-id <JOB_ID>
+
+# Reprocessamento de período específico
+databricks jobs run-now --job-id <JOB_ID> \
+  --notebook-params '{
+    "data_processamento": "2024-01-15",
+    "modo_execucao": "reprocessamento",
+    "dias_retroativos": "7"
+  }'
+```
+
+## 🔧 Modos de Execução
+
+### 1. Incremental (Padrão)
+```python
+modo_execucao = "incremental"
+```
+- Processa apenas **1 dia** (D-1)
+- Usa `APPEND` no Delta Lake
+- Ideal para execução diária automática
+- Mais rápido e eficiente
+
+### 2. Reprocessamento
+```python
+modo_execucao = "reprocessamento"
+dias_retroativos = 7  # últimos 7 dias
+```
+- Processa **múltiplos dias** retroativos
+- Usa `MERGE` no Delta Lake (evita duplicatas)
+- Ideal para correções ou backfill
+- Mais lento (devido ao merge)
+
+## 📈 Monitoramento
+
+### Métricas do Job
+
+O job salva métricas em:
+```sql
+SELECT * FROM innovation_dev.bronze.radiologia_laudos_metricas_job
+ORDER BY dt_execucao DESC
+```
+
+**Campos:**
+- `data_processamento`: Data de referência
+- `periodo_inicio` / `periodo_fim`: Período extraído
+- `procedimentos_ativos`: Quantidade de procedimentos na lista
+- `procedimentos_realizados`: Procedimentos encontrados no Oracle
+- `laudos_extraidos`: Laudos salvos no Bronze
+- `total_bronze`: Total acumulado na tabela Bronze
+- `dt_execucao`: Timestamp da execução
+
+### Queries de Monitoramento
+
+```sql
+-- Verificar última execução
+SELECT * 
+FROM innovation_dev.bronze.radiologia_laudos_metricas_job
+ORDER BY dt_execucao DESC
+LIMIT 1;
+
+-- Volume por dia
+SELECT 
+    dt_processamento,
+    COUNT(*) as total_laudos,
+    COUNT(DISTINCT accession_number) as laudos_unicos,
+    COUNT(DISTINCT cd_paciente) as pacientes_unicos,
+    COUNT(DISTINCT cd_procedimento) as procedimentos_distintos
+FROM innovation_dev.bronze.radiologia_laudos_extraidos
+GROUP BY dt_processamento
+ORDER BY dt_processamento DESC;
+
+-- ⚠️ VERIFICAR DUPLICATAS (deve retornar vazio!)
+SELECT * 
+FROM innovation_dev.bronze.vw_radiologia_laudos_duplicatas;
+
+-- Exemplo de accession_number
+SELECT 
+    accession_number,
+    cd_atendimento,
+    cd_ocorrencia,
+    cd_ordem,
+    cd_procedimento,
+    dt_procedimento_realizado
+FROM innovation_dev.bronze.radiologia_laudos_extraidos
+LIMIT 10;
+
+-- Volume por modalidade (últimos 30 dias)
+SELECT 
+    p.nome_modalidade,
+    COUNT(*) as total_laudos,
+    COUNT(DISTINCT l.accession_number) as laudos_unicos
+FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+    ON l.cd_procedimento = p.cd_procedimento
+WHERE l.dt_processamento >= CURRENT_DATE - INTERVAL 30 DAYS
+GROUP BY p.nome_modalidade
+ORDER BY total_laudos DESC;
+
+-- Verificar partições
+SHOW PARTITIONS innovation_dev.bronze.radiologia_laudos_extraidos;
+```
+
+## 🔍 Troubleshooting
+
+### Erro: "Nenhum procedimento ativo"
+**Causa:** Tabela Gold vazia ou todos procedimentos inativos  
+**Solução:** Cadastrar procedimentos via aplicação Streamlit
+
+### Erro: "Nenhum procedimento realizado no período"
+**Causa:** Não há dados no Oracle para o período/códigos  
+**Solução:** Verificar se os códigos estão corretos e se há dados no período
+
+### Erro: "Connection timeout Oracle"
+**Causa:** Cluster sem acesso à rede privada Oracle  
+**Solução:** Verificar configuração de rede do cluster
+
+### Erro: "Driver JDBC não encontrado"
+**Causa:** Driver `ojdbc11.jar` não está no path esperado  
+**Solução:** Upload do driver para `/Workspace/Libraries/DatalakeConnector/`
+
+### Job lento
+**Otimizações:**
+1. Aumentar número de workers (2 → 4)
+2. Verificar volume de dados (considerar filtros adicionais)
+3. Analisar plano de execução: `EXPLAIN` nas queries
+4. Considerar Z-ORDER na tabela Bronze:
+   ```sql
+   OPTIMIZE innovation_dev.bronze.radiologia_laudos_extraidos
+   ZORDER BY (CD_PROCEDIMENTO, DT_PROCEDIMENTO_REALIZADO)
+   ```
+
+## 🔄 Manutenção
+
+### Otimização Regular
+
+```sql
+-- Compactar arquivos pequenos
+OPTIMIZE innovation_dev.bronze.radiologia_laudos_extraidos;
+
+-- Z-ORDER para queries por procedimento/data
+OPTIMIZE innovation_dev.bronze.radiologia_laudos_extraidos
+ZORDER BY (accession_number, cd_procedimento, dt_procedimento_realizado);
+
+-- Vacuum (remover arquivos antigos > 7 dias)
+VACUUM innovation_dev.bronze.radiologia_laudos_extraidos RETAIN 168 HOURS;
+```
+
+### Reprocessamento Completo
+
+```bash
+# Reprocessar últimos 30 dias
+databricks jobs run-now --job-id <JOB_ID> \
+  --notebook-params '{
+    "data_processamento": "2024-01-31",
+    "modo_execucao": "reprocessamento",
+    "dias_retroativos": "30"
+  }'
+```
+
+## 📝 Logs
+
+### Visualizar Logs do Job
+
+1. Jobs → `radiologia_extracao_laudos_diaria`
+2. Runs → Selecionar execução
+3. View Logs
+
+### Logs Importantes
+
+- ✅ Conexão Oracle estabelecida
+- 📋 Quantidade de procedimentos ativos
+- 🔧 Tabela temporária criada
+- 🔍 Laudos extraídos
+- 💾 Dados salvos no Bronze
+- 📊 Métricas finais
+
+## 🎯 Próximos Passos
+
+Após a camada Bronze estar populada:
+
+1. **Silver Layer**: Limpeza e normalização dos laudos
+2. **Gold Layer**: Agregações e métricas de negócio
+3. **ML Pipeline**: Extração de entidades (NER) dos laudos
+4. **Dashboards**: Visualizações e análises
+
+## 📞 Suporte
+
+**Dúvidas ou problemas:**
+- Email: eduardo.caminha@hapvida.com.br
+- Slack: #innovation-radiologia
+- Documentação: Confluence → Radiologia Analytics

@@ -1,0 +1,77 @@
+# Configuração do Databricks Job
+# Job: Extração Diária de Laudos Radiológicos
+
+name: "radiologia_extracao_laudos_diaria"
+description: "Extração diária de laudos radiológicos do Oracle Lake para Delta Lake (Bronze)"
+
+# Schedule: Diário às 02:00 AM (horário de Brasília)
+schedule:
+  quartz_cron_expression: "0 0 2 * * ?"
+  timezone_id: "America/Sao_Paulo"
+  pause_status: "UNPAUSED"
+
+# Configuração do Cluster
+job_clusters:
+  - job_cluster_key: "extracao_laudos_cluster"
+    new_cluster:
+      spark_version: "13.3.x-scala2.12"
+      node_type_id: "Standard_DS3_v2"  # Ajustar conforme necessidade
+      num_workers: 2  # Escalar conforme volume
+      spark_conf:
+        "spark.databricks.delta.optimizeWrite.enabled": "true"
+        "spark.databricks.delta.autoCompact.enabled": "true"
+        "spark.sql.adaptive.enabled": "true"
+        "spark.sql.adaptive.coalescePartitions.enabled": "true"
+      custom_tags:
+        project: "radiologia"
+        team: "innovation"
+        cost_center: "analytics"
+      
+      # Acesso ao driver JDBC Oracle
+      init_scripts:
+        - workspace:
+            destination: "/Workspace/Libraries/DatalakeConnector/init_jdbc.sh"
+
+# Tasks
+tasks:
+  - task_key: "extracao_laudos"
+    job_cluster_key: "extracao_laudos_cluster"
+    
+    notebook_task:
+      notebook_path: "/Workspace/Repos/radiologia-laudos/jobs/extracao_laudos_diaria"
+      base_parameters:
+        # Parâmetros padrão (podem ser sobrescritos em execuções manuais)
+        data_processamento: ""  # Vazio = D-1 automático
+        modo_execucao: "incremental"
+        dias_retroativos: "1"
+    
+    timeout_seconds: 7200  # 2 horas
+    max_retries: 2
+    min_retry_interval_millis: 300000  # 5 minutos
+    retry_on_timeout: true
+    
+    # Notificações
+    email_notifications:
+      on_failure:
+        - "eduardo.caminha@hapvida.com.br"
+      on_success: []  # Opcional: adicionar emails para sucesso
+      no_alert_for_skipped_runs: true
+
+# Configurações de acesso
+access_control_list:
+  - user_name: "eduardo.caminha@hapvida.com.br"
+    permission_level: "IS_OWNER"
+  - group_name: "innovation_team"
+    permission_level: "CAN_MANAGE_RUN"
+
+# Tags para organização
+tags:
+  environment: "production"
+  project: "radiologia"
+  data_source: "oracle_lake"
+  data_destination: "delta_lake_bronze"
+  schedule: "daily"
+
+# Configurações adicionais
+max_concurrent_runs: 1  # Evitar execuções simultâneas
+format: "MULTI_TASK"
