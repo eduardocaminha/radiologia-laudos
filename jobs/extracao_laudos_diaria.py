@@ -411,8 +411,8 @@ metricas = {
     'periodo_fim': str(data_fim),
     'modo_execucao': modo_execucao,
     'procedimentos_ativos': len(lista_codigos),
-    'procedimentos_realizados': len(df_procedimentos_realizados),
-    'laudos_extraidos': len(df_laudos_pd),
+    'procedimentos_realizados': total_procedimentos,
+    'laudos_extraidos': count_depois,  # Após remoção de duplicatas
     'total_bronze': total_bronze,
     'dt_execucao': datetime.now().isoformat()
 }
@@ -425,9 +425,8 @@ for key, value in metricas.items():
     print(f"   {key:.<40} {value:>25}")
 print("="*70)
 
-# Limpar cache
-df_proc_spark.unpersist()
-print("\n🧹 Cache limpo!")
+# Finalização
+print("\n✅ Processamento concluído com sucesso!")
 
 # Salvar métricas em tabela de controle (opcional)
 df_metricas = spark.createDataFrame([metricas])
