@@ -337,7 +337,8 @@ print(f"Lotes com erro:              {len(lotes_com_erro)}")
 print(f"Procedimentos realizados:    {total_procedimentos_realizados:,}")
 print(f"Laudos extraídos:            {total_laudos_extraidos:,}")
 print(f"Tempo total:                 {total_tempo_processamento/60:.1f} minutos")
-print(f"Tempo médio por lote:        {total_tempo_processamento/max(lotes_processados,1):.1f} segundos")
+tempo_medio = total_tempo_processamento / lotes_processados if lotes_processados > 0 else 0
+print(f"Tempo médio por lote:        {tempo_medio:.1f} segundos")
 print("="*70)
 
 if modo_teste:
