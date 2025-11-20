@@ -118,6 +118,7 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
     cd_paciente BIGINT,
     ds_laudo_medico STRING,
     dt_procedimento_realizado TIMESTAMP,  -- Data + hora completa
+    fonte STRING,  -- Origem: HSP ou PSC
     ano_mes STRING,  -- Particionamento (YYYY-MM)
     dt_carga TIMESTAMP,  -- Quando foi carregado
     modo_execucao STRING  -- Como foi carregado (diario/reprocessamento_historico)
@@ -128,7 +129,8 @@ USING DELTA
 
 **Mudanças no Schema (Nov/2025):**
 - ✅ `dt_procedimento_realizado`: DATE → **TIMESTAMP** (inclui hora)
-- ✅ Schema otimizado: 11 colunas (foco em dados essenciais)
+- ✅ `fonte`: Nova coluna para identificar origem (**HSP** ou **PSC**)
+- ✅ Schema otimizado: 12 colunas (foco em dados essenciais)
 - ✅ Busca laudos de **HSP + PSC** (UNION ALL)
 
 ### Colunas Principais
@@ -142,8 +144,9 @@ USING DELTA
 
 ### Colunas de Controle
 
+- `fonte`: Origem do laudo (`HSP` = Hospital, `PSC` = Pronto Socorro)
 - `dt_carga`: Timestamp da carga no Delta Lake (quando foi carregado)
-- `modo_execucao`: `diario` ou `reprocessamento_historico` (como foi carregado)
+- `modo_execucao`: `job_diario` ou `reprocessamento_historico` (como foi carregado)
 
 ### Controle de Duplicidades
 
@@ -252,6 +255,17 @@ SELECT
 FROM innovation_dev.bronze.radiologia_laudos_extraidos
 GROUP BY ano, mes
 ORDER BY ano DESC, mes DESC;
+
+-- Volume por fonte (HSP vs PSC)
+SELECT 
+    fonte,
+    COUNT(*) as total_laudos,
+    COUNT(DISTINCT cd_paciente) as pacientes_unicos,
+    MIN(dt_procedimento_realizado) as primeiro_laudo,
+    MAX(dt_procedimento_realizado) as ultimo_laudo
+FROM innovation_dev.bronze.radiologia_laudos_extraidos
+GROUP BY fonte
+ORDER BY fonte;
 
 -- ⚠️ VERIFICAR DUPLICATAS (deve retornar vazio!)
 SELECT * 

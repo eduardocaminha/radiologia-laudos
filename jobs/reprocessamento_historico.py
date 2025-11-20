@@ -255,6 +255,7 @@ for i in range(num_lotes):
                 LAUP.DS_LAUDO_MEDICO,
                 temp.DT_PROCEDIMENTO_REALIZADO,
                 temp.HR_PROCEDIMENTO_REALIZADO,
+                'HSP' as FONTE,
                 TO_CHAR(temp.DT_PROCEDIMENTO_REALIZADO, 'YYYY-MM') as ANO_MES
             FROM temp_proc_radiologia temp
             INNER JOIN RAWZN.RAW_HSP_TM_ATENDIMENTO ATD
@@ -278,6 +279,7 @@ for i in range(num_lotes):
                 LAUP.DS_LAUDO_MEDICO,
                 temp.DT_PROCEDIMENTO_REALIZADO,
                 temp.HR_PROCEDIMENTO_REALIZADO,
+                'PSC' as FONTE,
                 TO_CHAR(temp.DT_PROCEDIMENTO_REALIZADO, 'YYYY-MM') as ANO_MES
             FROM temp_proc_radiologia temp
             INNER JOIN RAWZN.RAW_PSC_TM_ATENDIMENTO ATD

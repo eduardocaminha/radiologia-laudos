@@ -62,6 +62,7 @@ schema_laudos = StructType([
     StructField("cd_paciente", LongType(), True),
     StructField("ds_laudo_medico", StringType(), True),
     StructField("dt_procedimento_realizado", TimestampType(), True),  # TIMESTAMP completo (data + hora)
+    StructField("fonte", StringType(), False),  # Origem: HSP ou PSC
     StructField("ano_mes", StringType(), False),  # Particionamento (YYYY-MM)
     StructField("dt_carga", TimestampType(), True),  # Quando foi carregado
     StructField("modo_execucao", StringType(), True)  # Como foi carregado (diario/reprocessamento_historico)
