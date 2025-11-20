@@ -161,7 +161,8 @@ CREATE GLOBAL TEMPORARY TABLE temp_proc_radiologia (
     CD_OCORRENCIA NUMBER,
     CD_ORDEM NUMBER,
     CD_PROCEDIMENTO NUMBER,
-    DT_PROCEDIMENTO_REALIZADO DATE
+    DT_PROCEDIMENTO_REALIZADO DATE,
+    HR_PROCEDIMENTO_REALIZADO NUMBER
 ) ON COMMIT PRESERVE ROWS
 """
 
@@ -189,7 +190,8 @@ SELECT /*+ PARALLEL(8) */
     PREA.CD_OCORRENCIA,
     PREA.CD_ORDEM,
     PREA.CD_PROCEDIMENTO,
-    PREA.DT_PROCEDIMENTO_REALIZADO
+    PREA.DT_PROCEDIMENTO_REALIZADO,
+    PREA.HR_PROCEDIMENTO_REALIZADO
 FROM RAWZN.RAW_HSP_TB_PROCEDIMENTO_REALIZADO PREA
 WHERE PREA.CD_PROCEDIMENTO IN ({codigos_csv})
   AND PREA.DT_PROCEDIMENTO_REALIZADO >= DATE '{data_inicio}'
@@ -234,8 +236,7 @@ SELECT /*+ PARALLEL(8) */
     ATD.CD_PACIENTE,
     LAUP.DS_LAUDO_MEDICO,
     temp.DT_PROCEDIMENTO_REALIZADO,
-    EXTRACT(YEAR FROM temp.DT_PROCEDIMENTO_REALIZADO) as ANO,
-    EXTRACT(MONTH FROM temp.DT_PROCEDIMENTO_REALIZADO) as MES,
+    temp.HR_PROCEDIMENTO_REALIZADO,
     TO_CHAR(temp.DT_PROCEDIMENTO_REALIZADO, 'YYYY-MM') as ANO_MES
 FROM temp_proc_radiologia temp
 INNER JOIN RAWZN.RAW_HSP_TM_ATENDIMENTO ATD
@@ -288,6 +289,16 @@ except:
 
 # Renomear colunas para minúsculo (padrão Delta Lake)
 df_laudos_pd.columns = [col.lower() for col in df_laudos_pd.columns]
+
+# Combinar data + hora em timestamp
+# HR_PROCEDIMENTO_REALIZADO está em segundos desde meia-noite
+import pandas as pd
+df_laudos_pd['dt_procedimento_realizado'] = pd.to_datetime(df_laudos_pd['dt_procedimento_realizado'])
+df_laudos_pd['hr_segundos'] = pd.to_numeric(df_laudos_pd['hr_procedimento_realizado'], errors='coerce').fillna(0)
+df_laudos_pd['dt_procedimento_realizado'] = df_laudos_pd['dt_procedimento_realizado'] + pd.to_timedelta(df_laudos_pd['hr_segundos'], unit='s')
+
+# Remover coluna auxiliar
+df_laudos_pd = df_laudos_pd.drop(columns=['hr_procedimento_realizado', 'hr_segundos'])
 
 # Converter para Spark DataFrame
 df_laudos = spark.createDataFrame(df_laudos_pd)
