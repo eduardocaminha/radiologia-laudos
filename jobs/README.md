@@ -15,13 +15,15 @@ Alimentar diariamente uma tabela Bronze no Delta Lake com laudos de exames radio
 - ✅ **Otimizado**: Tabela temporária + índices para joins eficientes
 
 ### Dados
-- **Origem**: Oracle Lake (RAWZN)
-  - `RAW_HSP_TB_PROCEDIMENTO_REALIZADO` (procedimentos realizados)
-  - `RAW_HSP_TM_ATENDIMENTO` (dados do paciente)
-  - `RAW_HSP_TB_LAUDO_PACIENTE` (laudos)
+- **Origem**: Oracle Lake (RAWZN) - **HSP + PSC**
+  - `RAW_HSP_TB_PROCEDIMENTO_REALIZADO` + `RAW_PSC_TB_PROCEDIMENTO_REALIZADO`
+  - `RAW_HSP_TM_ATENDIMENTO` + `RAW_PSC_TM_ATENDIMENTO`
+  - `RAW_HSP_TB_LAUDO_PACIENTE` + `RAW_PSC_TB_LAUDO_PACIENTE`
 - **Destino**: Delta Lake Bronze
   - `innovation_dev.bronze.radiologia_laudos_extraidos`
   - Particionado por `ano_mes` (YYYY-MM)
+  
+> **📌 Nota:** Busca laudos tanto de **HSP (Hospital)** quanto de **PSC (Pronto Socorro)** usando UNION ALL
 
 ### Procedimentos
 - Lista dinâmica obtida do Gold: `radiologia_laudos_procedimentos`
@@ -129,6 +131,7 @@ USING DELTA
 - ✅ `dt_procedimento_realizado`: DATE → **TIMESTAMP** (inclui hora)
 - ❌ Removido: `ano`, `mes` (redundantes - usar `YEAR()` e `MONTH()` em queries)
 - ✅ Mantido: `ano_mes` (otimização de particionamento)
+- ✅ **Novo:** Busca laudos de **HSP + PSC** (UNION ALL)
 
 ### Colunas Principais
 
