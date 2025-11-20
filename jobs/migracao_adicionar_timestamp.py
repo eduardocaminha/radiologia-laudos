@@ -279,9 +279,8 @@ df_bronze_atualizado = df_bronze_atual.alias("bronze").join(
     coalesce(col("horas.dt_procedimento_realizado"), col("bronze.dt_procedimento_realizado").cast(TimestampType())).alias("dt_procedimento_realizado"),
     col("bronze.ano_mes"),
     col("bronze.dt_carga"),
-    col("bronze.dt_processamento"),
     col("bronze.modo_execucao")
-    # Removido: ano, mes
+    # Removido: ano, mes, dt_processamento
 )
 
 # Verificar quantos foram atualizados
@@ -326,12 +325,18 @@ df_novo.select(
     "ano_mes"
 ).show(10, truncate=False)
 
-# Verificar se colunas ano e mes foram removidas
+# Verificar se colunas foram removidas
 colunas = df_novo.columns
-if 'ano' in colunas or 'mes' in colunas:
-    print("\n⚠️  ATENÇÃO: Colunas 'ano' e/ou 'mes' ainda existem!")
+colunas_removidas = []
+if 'ano' not in colunas and 'mes' not in colunas:
+    colunas_removidas.append("ano, mes")
+if 'dt_processamento' not in colunas:
+    colunas_removidas.append("dt_processamento")
+
+if colunas_removidas:
+    print(f"\n✅ Colunas removidas: {', '.join(colunas_removidas)}")
 else:
-    print("\n✅ Colunas 'ano' e 'mes' removidas com sucesso!")
+    print("\n⚠️  ATENÇÃO: Algumas colunas ainda existem!")
 
 # COMMAND ----------
 

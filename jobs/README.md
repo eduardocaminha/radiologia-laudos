@@ -119,9 +119,8 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
     ds_laudo_medico STRING,
     dt_procedimento_realizado TIMESTAMP,  -- Data + hora completa
     ano_mes STRING,  -- Particionamento (YYYY-MM)
-    dt_carga TIMESTAMP,
-    dt_processamento STRING,
-    modo_execucao STRING
+    dt_carga TIMESTAMP,  -- Quando foi carregado
+    modo_execucao STRING  -- Como foi carregado (diario/reprocessamento_historico)
 )
 PARTITIONED BY (ano_mes)
 USING DELTA
@@ -129,8 +128,8 @@ USING DELTA
 
 **Mudanças no Schema (Nov/2025):**
 - ✅ `dt_procedimento_realizado`: DATE → **TIMESTAMP** (inclui hora)
-- ❌ Removido: `ano`, `mes` (redundantes - usar `YEAR()` e `MONTH()` em queries)
-- ✅ Mantido: `ano_mes` (otimização de particionamento)
+- ❌ Removido: `ano`, `mes`, `dt_processamento` (redundantes)
+- ✅ Mantido: `ano_mes` (particionamento), `dt_carga` (auditoria), `modo_execucao` (rastreabilidade)
 - ✅ **Novo:** Busca laudos de **HSP + PSC** (UNION ALL)
 
 ### Colunas Principais
@@ -144,9 +143,8 @@ USING DELTA
 
 ### Colunas de Controle
 
-- `dt_carga`: Timestamp da carga no Delta Lake
-- `dt_processamento`: Data de referência do processamento (D-1)
-- `modo_execucao`: `incremental` ou `reprocessamento`
+- `dt_carga`: Timestamp da carga no Delta Lake (quando foi carregado)
+- `modo_execucao`: `diario` ou `reprocessamento_historico` (como foi carregado)
 
 ### Controle de Duplicidades
 
@@ -235,16 +233,17 @@ FROM innovation_dev.bronze.radiologia_laudos_metricas_job
 ORDER BY dt_execucao DESC
 LIMIT 1;
 
--- Volume por dia
+-- Volume por dia de carga
 SELECT 
-    dt_processamento,
+    DATE(dt_carga) as dia_carga,
+    modo_execucao,
     COUNT(*) as total_laudos,
     COUNT(DISTINCT accession_number) as laudos_unicos,
     COUNT(DISTINCT cd_paciente) as pacientes_unicos,
     COUNT(DISTINCT cd_procedimento) as procedimentos_distintos
 FROM innovation_dev.bronze.radiologia_laudos_extraidos
-GROUP BY dt_processamento
-ORDER BY dt_processamento DESC;
+GROUP BY dia_carga, modo_execucao
+ORDER BY dia_carga DESC;
 
 -- Volume por ano/mês (usando função YEAR/MONTH)
 SELECT 
@@ -278,7 +277,7 @@ SELECT
 FROM innovation_dev.bronze.radiologia_laudos_extraidos l
 INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
     ON l.cd_procedimento = p.cd_procedimento
-WHERE l.dt_processamento >= CURRENT_DATE - INTERVAL 30 DAYS
+WHERE l.dt_carga >= CURRENT_DATE - INTERVAL 30 DAYS
 GROUP BY p.nome_modalidade
 ORDER BY total_laudos DESC;
 
@@ -521,10 +520,10 @@ dias_retroativos: 1
 ## Verificação
 
 ```sql
--- Ver dados extraídos
+-- Ver dados extraídos (por dia de carga)
 SELECT * 
 FROM innovation_dev.bronze.radiologia_laudos_extraidos
-WHERE dt_processamento = '2025-11-18'
+WHERE DATE(dt_carga) = '2025-11-18'
 LIMIT 10;
 
 -- Ver métricas

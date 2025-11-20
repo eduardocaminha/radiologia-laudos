@@ -388,7 +388,6 @@ print(f"💾 Salvando laudos no Delta Lake: {TABLE_LAUDOS_BRONZE}")
 
 # Adicionar metadados de controle
 df_laudos_final = df_laudos.withColumn("dt_carga", current_timestamp()) \
-                            .withColumn("dt_processamento", lit(str(data_processamento))) \
                             .withColumn("modo_execucao", lit(modo_execucao))
 
 # Verificar se tabela existe
@@ -425,8 +424,7 @@ else:
         ).whenMatchedUpdate(
             set = {
                 "ds_laudo_medico": "source.ds_laudo_medico",
-                "dt_carga": "source.dt_carga",
-                "dt_processamento": "source.dt_processamento"
+                "dt_carga": "source.dt_carga"
             }
         ).whenNotMatchedInsertAll() \
          .execute()

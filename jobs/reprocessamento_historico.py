@@ -333,7 +333,6 @@ for i in range(num_lotes):
         
         # Adicionar metadados
         df_laudos_final = df_laudos.withColumn("dt_carga", current_timestamp()) \
-            .withColumn("dt_processamento", lit(str(lote_inicio))) \
             .withColumn("modo_execucao", lit("reprocessamento_historico"))
         
         # Salvar no Delta Lake
@@ -439,13 +438,12 @@ if not modo_teste and lotes_processados > 0:
             ano_mes,
             COUNT(*) as total_laudos,
             COUNT(DISTINCT accession_number) as laudos_unicos,
-            COUNT(DISTINCT cd_procedimento) as procedimentos_distintos,
-            COUNT(DISTINCT cd_paciente) as pacientes_distintos,
             MIN(dt_procedimento_realizado) as data_min,
             MAX(dt_procedimento_realizado) as data_max
         FROM {TABLE_LAUDOS_BRONZE}
-        WHERE dt_processamento >= '{data_inicio}'
-          AND dt_processamento < '{data_fim}'
+        WHERE modo_execucao = 'reprocessamento_historico'
+          AND DATE(dt_carga) >= '{data_inicio}'
+          AND DATE(dt_carga) < '{data_fim}'
         GROUP BY ano_mes
         ORDER BY ano_mes
     """)
@@ -457,8 +455,9 @@ if not modo_teste and lotes_processados > 0:
     df_duplicatas = spark.sql(f"""
         SELECT accession_number, COUNT(*) as count
         FROM {TABLE_LAUDOS_BRONZE}
-        WHERE dt_processamento >= '{data_inicio}'
-          AND dt_processamento < '{data_fim}'
+        WHERE modo_execucao = 'reprocessamento_historico'
+          AND DATE(dt_carga) >= '{data_inicio}'
+          AND DATE(dt_carga) < '{data_fim}'
         GROUP BY accession_number
         HAVING COUNT(*) > 1
     """)

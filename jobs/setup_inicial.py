@@ -63,10 +63,10 @@ schema_laudos = StructType([
     StructField("ds_laudo_medico", StringType(), True),
     StructField("dt_procedimento_realizado", TimestampType(), True),  # TIMESTAMP completo (data + hora)
     StructField("ano_mes", StringType(), False),  # Particionamento (YYYY-MM)
-    StructField("dt_carga", TimestampType(), True),
-    StructField("dt_processamento", StringType(), True),
-    StructField("modo_execucao", StringType(), True)
+    StructField("dt_carga", TimestampType(), True),  # Quando foi carregado
+    StructField("modo_execucao", StringType(), True)  # Como foi carregado (diario/reprocessamento_historico)
     # Removido: ano, mes (redundantes - usar YEAR() e MONTH() em queries)
+    # Removido: dt_processamento (redundante - usar DATE(dt_carga))
 ])
 
 # Criar DataFrame vazio com o schema
