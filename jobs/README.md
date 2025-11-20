@@ -186,12 +186,12 @@ databricks jobs run-now --job-id <JOB_ID> \
 
 ## 🔧 Modos de Execução
 
-### 1. Incremental (Padrão)
+### 1. Job Diário (Padrão)
 ```python
-modo_execucao = "incremental"
+modo_execucao = "job_diario"
 ```
 - Processa apenas **1 dia** (D-1)
-- Usa `APPEND` no Delta Lake
+- Usa `MERGE` no Delta Lake
 - Ideal para execução diária automática
 - Mais rápido e eficiente
 
@@ -503,7 +503,7 @@ modo_teste: true       # ← Apenas mostra estatísticas
 
 3. **Configurar widgets (deixar vazios para automático):**
    - `data_processamento`: *vazio* (calcula D-1)
-   - `modo_execucao`: `incremental`
+   - `modo_execucao`: `job_diario`
    - `dias_retroativos`: `1`
 
 ## Teste Manual
@@ -511,7 +511,7 @@ modo_teste: true       # ← Apenas mostra estatísticas
 ```python
 # Configure os widgets:
 data_processamento: 2025-11-18  # Dia específico
-modo_execucao: incremental
+modo_execucao: job_diario
 dias_retroativos: 1
 
 # Execute o notebook

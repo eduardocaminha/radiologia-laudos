@@ -37,7 +37,7 @@ import pandas as pd
 
 # Widgets para parametrização
 dbutils.widgets.text("data_processamento", "", "Data Processamento (YYYY-MM-DD)")
-dbutils.widgets.dropdown("modo_execucao", "incremental", ["incremental", "reprocessamento"], "Modo Execução")
+dbutils.widgets.dropdown("modo_execucao", "job_diario", ["job_diario", "reprocessamento"], "Modo Execução")
 dbutils.widgets.text("dias_retroativos", "1", "Dias Retroativos (reprocessamento)")
 
 # Obter parâmetros
@@ -53,7 +53,7 @@ else:
     data_processamento = (datetime.now() - timedelta(days=1)).date()
 
 # Período de extração
-if modo_execucao == "incremental":
+if modo_execucao == "job_diario":
     # Processar apenas 1 dia (D-1)
     data_inicio = data_processamento
     data_fim = data_processamento + timedelta(days=1)
@@ -414,9 +414,9 @@ else:
     from delta.tables import DeltaTable
     delta_table = DeltaTable.forName(spark, TABLE_LAUDOS_BRONZE)
     
-    if modo_execucao == "incremental":
-        # Incremental: usar merge para evitar duplicatas mesmo em modo incremental
-        print("📝 Aplicando merge incremental (evita duplicatas)...")
+    if modo_execucao == "job_diario":
+        # Job diário: usar merge para evitar duplicatas
+        print("📝 Aplicando merge do job diário (evita duplicatas)...")
         
         delta_table.alias("target").merge(
             df_laudos_final.alias("source"),
@@ -429,7 +429,7 @@ else:
         ).whenNotMatchedInsertAll() \
          .execute()
         
-        print("✅ Merge incremental concluído (sem duplicatas)!")
+        print("✅ Merge do job diário concluído (sem duplicatas)!")
     else:
         # Reprocessamento: merge completo
         print("📝 Aplicando merge de reprocessamento...")
