@@ -128,9 +128,8 @@ USING DELTA
 
 **Mudanças no Schema (Nov/2025):**
 - ✅ `dt_procedimento_realizado`: DATE → **TIMESTAMP** (inclui hora)
-- ❌ Removido: `ano`, `mes`, `dt_processamento` (redundantes)
-- ✅ Mantido: `ano_mes` (particionamento), `dt_carga` (auditoria), `modo_execucao` (rastreabilidade)
-- ✅ **Novo:** Busca laudos de **HSP + PSC** (UNION ALL)
+- ✅ Schema otimizado: 11 colunas (foco em dados essenciais)
+- ✅ Busca laudos de **HSP + PSC** (UNION ALL)
 
 ### Colunas Principais
 

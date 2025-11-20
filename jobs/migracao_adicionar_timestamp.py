@@ -280,7 +280,6 @@ df_bronze_atualizado = df_bronze_atual.alias("bronze").join(
     col("bronze.ano_mes"),
     col("bronze.dt_carga"),
     col("bronze.modo_execucao")
-    # Removido: ano, mes, dt_processamento
 )
 
 # Verificar quantos foram atualizados
