@@ -161,6 +161,14 @@ for i in range(num_lotes):
     
     try:
         # Criar/limpar tabela temporária no Oracle
+        # Primeiro tentar dropar (se existir com estrutura antiga)
+        try:
+            run_sql("DROP TABLE temp_proc_radiologia")
+            print("   🗑️  Tabela temporária antiga removida")
+        except:
+            pass  # Não existe, tudo bem
+        
+        # Criar nova tabela
         query_create_temp = """
         CREATE GLOBAL TEMPORARY TABLE temp_proc_radiologia (
             CD_ATENDIMENTO NUMBER,
@@ -172,19 +180,8 @@ for i in range(num_lotes):
         ) ON COMMIT PRESERVE ROWS
         """
         
-        try:
-            run_sql(query_create_temp)
-            print("   ✅ Tabela temporária criada")
-        except Exception as e:
-            if "ORA-00955" in str(e):
-                try:
-                    run_sql("TRUNCATE TABLE temp_proc_radiologia")
-                    print("   ✅ Tabela temporária limpa")
-                except:
-                    run_sql("DELETE FROM temp_proc_radiologia")
-                    print("   ✅ Tabela temporária deletada")
-            else:
-                raise e
+        run_sql(query_create_temp)
+        print("   ✅ Tabela temporária criada")
         
         # Popular tabela temporária (HSP + PSC)
         query_insert_temp = f"""
