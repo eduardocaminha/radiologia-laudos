@@ -186,20 +186,45 @@ for i in range(num_lotes):
             else:
                 raise e
         
-        # Popular tabela temporária
+        # Popular tabela temporária (HSP + PSC)
         query_insert_temp = f"""
         INSERT INTO temp_proc_radiologia
         SELECT /*+ PARALLEL(8) */
-            PREA.CD_ATENDIMENTO,
-            PREA.CD_OCORRENCIA,
-            PREA.CD_ORDEM,
-            PREA.CD_PROCEDIMENTO,
-            PREA.DT_PROCEDIMENTO_REALIZADO,
-            PREA.HR_PROCEDIMENTO_REALIZADO
-        FROM RAWZN.RAW_HSP_TB_PROCEDIMENTO_REALIZADO PREA
-        WHERE PREA.CD_PROCEDIMENTO IN ({codigos_csv})
-          AND PREA.DT_PROCEDIMENTO_REALIZADO >= DATE '{lote_inicio}'
-          AND PREA.DT_PROCEDIMENTO_REALIZADO < DATE '{lote_fim}'
+            CD_ATENDIMENTO,
+            CD_OCORRENCIA,
+            CD_ORDEM,
+            CD_PROCEDIMENTO,
+            DT_PROCEDIMENTO_REALIZADO,
+            HR_PROCEDIMENTO_REALIZADO
+        FROM (
+            -- HSP (Hospital)
+            SELECT 
+                PREA.CD_ATENDIMENTO,
+                PREA.CD_OCORRENCIA,
+                PREA.CD_ORDEM,
+                PREA.CD_PROCEDIMENTO,
+                PREA.DT_PROCEDIMENTO_REALIZADO,
+                PREA.HR_PROCEDIMENTO_REALIZADO
+            FROM RAWZN.RAW_HSP_TB_PROCEDIMENTO_REALIZADO PREA
+            WHERE PREA.CD_PROCEDIMENTO IN ({codigos_csv})
+              AND PREA.DT_PROCEDIMENTO_REALIZADO >= DATE '{lote_inicio}'
+              AND PREA.DT_PROCEDIMENTO_REALIZADO < DATE '{lote_fim}'
+            
+            UNION ALL
+            
+            -- PSC (Pronto Socorro)
+            SELECT 
+                PREA.CD_ATENDIMENTO,
+                PREA.CD_OCORRENCIA,
+                PREA.CD_ORDEM,
+                PREA.CD_PROCEDIMENTO,
+                PREA.DT_PROCEDIMENTO_REALIZADO,
+                PREA.HR_PROCEDIMENTO_REALIZADO
+            FROM RAWZN.RAW_PSC_TB_PROCEDIMENTO_REALIZADO PREA
+            WHERE PREA.CD_PROCEDIMENTO IN ({codigos_csv})
+              AND PREA.DT_PROCEDIMENTO_REALIZADO >= DATE '{lote_inicio}'
+              AND PREA.DT_PROCEDIMENTO_REALIZADO < DATE '{lote_fim}'
+        )
         """
         
         run_sql(query_insert_temp)
@@ -216,27 +241,53 @@ for i in range(num_lotes):
             print(f"   ⚠️  Nenhum procedimento neste período, pulando...")
             continue
         
-        # Extrair laudos
+        # Extrair laudos (HSP + PSC)
         query_laudos = """
-        SELECT /*+ PARALLEL(8) */
-            temp.CD_ATENDIMENTO,
-            temp.CD_OCORRENCIA,
-            temp.CD_ORDEM,
-            TO_CHAR(temp.CD_ATENDIMENTO) || TO_CHAR(temp.CD_OCORRENCIA) || TO_CHAR(temp.CD_ORDEM) as ACCESSION_NUMBER,
-            temp.CD_PROCEDIMENTO,
-            ATD.CD_PACIENTE,
-            LAUP.DS_LAUDO_MEDICO,
-            temp.DT_PROCEDIMENTO_REALIZADO,
-            temp.HR_PROCEDIMENTO_REALIZADO,
-            TO_CHAR(temp.DT_PROCEDIMENTO_REALIZADO, 'YYYY-MM') as ANO_MES
-        FROM temp_proc_radiologia temp
-        INNER JOIN RAWZN.RAW_HSP_TM_ATENDIMENTO ATD
-            ON temp.CD_ATENDIMENTO = ATD.CD_ATENDIMENTO
-        INNER JOIN RAWZN.RAW_HSP_TB_LAUDO_PACIENTE LAUP
-            ON temp.CD_ATENDIMENTO = LAUP.CD_ATENDIMENTO
-            AND temp.CD_OCORRENCIA = LAUP.CD_OCORRENCIA
-            AND temp.CD_ORDEM = LAUP.CD_ORDEM
-        WHERE LAUP.DS_LAUDO_MEDICO IS NOT NULL
+        SELECT /*+ PARALLEL(8) */ * FROM (
+            -- HSP (Hospital)
+            SELECT 
+                temp.CD_ATENDIMENTO,
+                temp.CD_OCORRENCIA,
+                temp.CD_ORDEM,
+                TO_CHAR(temp.CD_ATENDIMENTO) || TO_CHAR(temp.CD_OCORRENCIA) || TO_CHAR(temp.CD_ORDEM) as ACCESSION_NUMBER,
+                temp.CD_PROCEDIMENTO,
+                ATD.CD_PACIENTE,
+                LAUP.DS_LAUDO_MEDICO,
+                temp.DT_PROCEDIMENTO_REALIZADO,
+                temp.HR_PROCEDIMENTO_REALIZADO,
+                TO_CHAR(temp.DT_PROCEDIMENTO_REALIZADO, 'YYYY-MM') as ANO_MES
+            FROM temp_proc_radiologia temp
+            INNER JOIN RAWZN.RAW_HSP_TM_ATENDIMENTO ATD
+                ON temp.CD_ATENDIMENTO = ATD.CD_ATENDIMENTO
+            INNER JOIN RAWZN.RAW_HSP_TB_LAUDO_PACIENTE LAUP
+                ON temp.CD_ATENDIMENTO = LAUP.CD_ATENDIMENTO
+                AND temp.CD_OCORRENCIA = LAUP.CD_OCORRENCIA
+                AND temp.CD_ORDEM = LAUP.CD_ORDEM
+            WHERE LAUP.DS_LAUDO_MEDICO IS NOT NULL
+            
+            UNION ALL
+            
+            -- PSC (Pronto Socorro)
+            SELECT 
+                temp.CD_ATENDIMENTO,
+                temp.CD_OCORRENCIA,
+                temp.CD_ORDEM,
+                TO_CHAR(temp.CD_ATENDIMENTO) || TO_CHAR(temp.CD_OCORRENCIA) || TO_CHAR(temp.CD_ORDEM) as ACCESSION_NUMBER,
+                temp.CD_PROCEDIMENTO,
+                ATD.CD_PACIENTE,
+                LAUP.DS_LAUDO_MEDICO,
+                temp.DT_PROCEDIMENTO_REALIZADO,
+                temp.HR_PROCEDIMENTO_REALIZADO,
+                TO_CHAR(temp.DT_PROCEDIMENTO_REALIZADO, 'YYYY-MM') as ANO_MES
+            FROM temp_proc_radiologia temp
+            INNER JOIN RAWZN.RAW_PSC_TM_ATENDIMENTO ATD
+                ON temp.CD_ATENDIMENTO = ATD.CD_ATENDIMENTO
+            INNER JOIN RAWZN.RAW_PSC_TB_LAUDO_PACIENTE LAUP
+                ON temp.CD_ATENDIMENTO = LAUP.CD_ATENDIMENTO
+                AND temp.CD_OCORRENCIA = LAUP.CD_OCORRENCIA
+                AND temp.CD_ORDEM = LAUP.CD_ORDEM
+            WHERE LAUP.DS_LAUDO_MEDICO IS NOT NULL
+        )
         """
         
         df_laudos_pd = run_sql(query_laudos)

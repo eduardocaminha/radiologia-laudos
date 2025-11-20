@@ -168,16 +168,31 @@ for i in range(num_lotes):
     
     where_clause = " OR ".join(condicoes)
     
-    # Query Oracle
+    # Query Oracle (HSP + PSC)
     query = f"""
-    SELECT 
-        CD_ATENDIMENTO,
-        CD_OCORRENCIA,
-        CD_ORDEM,
-        DT_PROCEDIMENTO_REALIZADO,
-        HR_PROCEDIMENTO_REALIZADO
-    FROM RAWZN.RAW_HSP_TB_PROCEDIMENTO_REALIZADO
-    WHERE {where_clause}
+    SELECT * FROM (
+        -- HSP (Hospital)
+        SELECT 
+            CD_ATENDIMENTO,
+            CD_OCORRENCIA,
+            CD_ORDEM,
+            DT_PROCEDIMENTO_REALIZADO,
+            HR_PROCEDIMENTO_REALIZADO
+        FROM RAWZN.RAW_HSP_TB_PROCEDIMENTO_REALIZADO
+        WHERE {where_clause}
+        
+        UNION ALL
+        
+        -- PSC (Pronto Socorro)
+        SELECT 
+            CD_ATENDIMENTO,
+            CD_OCORRENCIA,
+            CD_ORDEM,
+            DT_PROCEDIMENTO_REALIZADO,
+            HR_PROCEDIMENTO_REALIZADO
+        FROM RAWZN.RAW_PSC_TB_PROCEDIMENTO_REALIZADO
+        WHERE {where_clause}
+    )
     """
     
     try:
