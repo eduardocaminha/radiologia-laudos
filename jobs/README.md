@@ -115,10 +115,8 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
     cd_procedimento BIGINT,
     cd_paciente BIGINT,
     ds_laudo_medico STRING,
-    dt_procedimento_realizado DATE,
-    ano INT,
-    mes INT,
-    ano_mes STRING,
+    dt_procedimento_realizado TIMESTAMP,  -- Data + hora completa
+    ano_mes STRING,  -- Particionamento (YYYY-MM)
     dt_carga TIMESTAMP,
     dt_processamento STRING,
     modo_execucao STRING
@@ -126,6 +124,11 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
 PARTITIONED BY (ano_mes)
 USING DELTA
 ```
+
+**Mudanças no Schema (Nov/2025):**
+- ✅ `dt_procedimento_realizado`: DATE → **TIMESTAMP** (inclui hora)
+- ❌ Removido: `ano`, `mes` (redundantes - usar `YEAR()` e `MONTH()` em queries)
+- ✅ Mantido: `ano_mes` (otimização de particionamento)
 
 ### Colunas Principais
 
@@ -240,6 +243,15 @@ FROM innovation_dev.bronze.radiologia_laudos_extraidos
 GROUP BY dt_processamento
 ORDER BY dt_processamento DESC;
 
+-- Volume por ano/mês (usando função YEAR/MONTH)
+SELECT 
+    YEAR(dt_procedimento_realizado) as ano,
+    MONTH(dt_procedimento_realizado) as mes,
+    COUNT(*) as total_laudos
+FROM innovation_dev.bronze.radiologia_laudos_extraidos
+GROUP BY ano, mes
+ORDER BY ano DESC, mes DESC;
+
 -- ⚠️ VERIFICAR DUPLICATAS (deve retornar vazio!)
 SELECT * 
 FROM innovation_dev.bronze.vw_radiologia_laudos_duplicatas;
@@ -299,6 +311,34 @@ SHOW PARTITIONS innovation_dev.bronze.radiologia_laudos_extraidos;
    OPTIMIZE innovation_dev.bronze.radiologia_laudos_extraidos
    ZORDER BY (CD_PROCEDIMENTO, DT_PROCEDIMENTO_REALIZADO)
    ```
+
+## 🔄 Migração de Schema (Nov/2025)
+
+### Script de Migração
+
+Para atualizar dados existentes com timestamp completo, execute **UMA VEZ**:
+
+```python
+# Notebook: migracao_adicionar_timestamp.py
+%run /Workspace/Repos/radiologia-laudos/jobs/migracao_adicionar_timestamp
+```
+
+**O que faz:**
+1. ✅ Cria backup automático
+2. ✅ Busca `HR_PROCEDIMENTO_REALIZADO` do Oracle
+3. ✅ Combina data + hora em TIMESTAMP
+4. ✅ Remove colunas `ano` e `mes`
+5. ✅ Otimiza tabela Delta
+
+**Tempo estimado:** 30-60 minutos (dependendo do volume)
+
+### Após a Migração
+
+1. ✅ Fazer pull dos notebooks atualizados no Databricks
+2. ✅ Testar job diário com novo schema
+3. ✅ (Opcional) Deletar backup após validação
+
+---
 
 ## 🔄 Manutenção
 
