@@ -242,15 +242,28 @@ def renderizar_dashboard(conn):
         df_volume = execute_query(conn, query_volume_dia)
         
         if len(df_volume) > 0:
+            # Converter coluna data para datetime
+            df_volume['data'] = pd.to_datetime(df_volume['data'])
+            
+            # Criar range completo de datas para preencher gaps
+            data_min = df_volume['data'].min()
+            data_max = df_volume['data'].max()
+            date_range = pd.date_range(start=data_min, end=data_max, freq='D')
+            
+            # Reindexar para incluir todas as datas
+            df_volume_completo = df_volume.set_index('data').reindex(date_range, fill_value=0).reset_index()
+            df_volume_completo.columns = ['data', 'total_laudos', 'pacientes']
+            
             fig_volume = go.Figure()
             
             fig_volume.add_trace(go.Scatter(
-                x=df_volume['data'],
-                y=df_volume['total_laudos'],
+                x=df_volume_completo['data'],
+                y=df_volume_completo['total_laudos'],
                 mode='lines+markers',
                 name='Laudos',
                 line=dict(color='#1f77b4', width=2),
-                marker=dict(size=6)
+                marker=dict(size=6),
+                connectgaps=False  # Não conectar gaps (dias sem dados)
             ))
             
             fig_volume.update_layout(
@@ -262,6 +275,11 @@ def renderizar_dashboard(conn):
             )
             
             st.plotly_chart(fig_volume, use_container_width=True)
+            
+            # Mostrar dias sem dados se houver
+            dias_sem_dados = df_volume_completo[df_volume_completo['total_laudos'] == 0]
+            if len(dias_sem_dados) > 0:
+                st.caption(f"⚠️ {len(dias_sem_dados)} dia(s) sem laudos no período: {', '.join(dias_sem_dados['data'].dt.strftime('%d/%m').tolist())}")
         else:
             st.info("Sem dados para o período selecionado")
     
