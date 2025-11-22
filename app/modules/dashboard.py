@@ -553,11 +553,11 @@ def renderizar_dashboard(conn):
         # Query para agrupar por descrição (região anatômica/técnica)
         query_descricoes = f"""
         SELECT 
-            d.descricao as Descrição,
-            COUNT(DISTINCT {alias_tabela}.accession_number) as `Total Laudos`,
-            COUNT(DISTINCT {alias_tabela}.cd_paciente) as `Pacientes Únicos`,
-            COUNT(DISTINCT {alias_tabela}.cd_procedimento) as `Procedimentos Distintos`,
-            ROUND(COUNT(DISTINCT {alias_tabela}.accession_number) * 100.0 / SUM(COUNT(DISTINCT {alias_tabela}.accession_number)) OVER (), 2) as `% do Total`
+            d.descricao as `Descrição`,
+            COUNT(DISTINCT l.accession_number) as `Total Laudos`,
+            COUNT(DISTINCT l.cd_paciente) as `Pacientes Únicos`,
+            COUNT(DISTINCT l.cd_procedimento) as `Procedimentos Distintos`,
+            ROUND(COUNT(DISTINCT l.accession_number) * 100.0 / SUM(COUNT(DISTINCT l.accession_number)) OVER (), 2) as `% do Total`
         FROM innovation_dev.bronze.radiologia_laudos_extraidos l
         INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
             ON l.cd_procedimento = p.cd_procedimento
