@@ -357,12 +357,12 @@ df_laudos_pd.columns = [col.lower() for col in df_laudos_pd.columns]
 # Combinar data + hora em timestamp
 # HR_PROCEDIMENTO_REALIZADO está em segundos desde meia-noite
 import pandas as pd
-df_laudos_pd['dt_procedimento_realizado'] = pd.to_datetime(df_laudos_pd['dt_procedimento_realizado'])
+df_laudos_pd['tms_procedimento_realizado'] = pd.to_datetime(df_laudos_pd['dt_procedimento_realizado'])
 df_laudos_pd['hr_segundos'] = pd.to_numeric(df_laudos_pd['hr_procedimento_realizado'], errors='coerce').fillna(0)
-df_laudos_pd['dt_procedimento_realizado'] = df_laudos_pd['dt_procedimento_realizado'] + pd.to_timedelta(df_laudos_pd['hr_segundos'], unit='s')
+df_laudos_pd['tms_procedimento_realizado'] = df_laudos_pd['tms_procedimento_realizado'] + pd.to_timedelta(df_laudos_pd['hr_segundos'], unit='s')
 
-# Remover coluna auxiliar
-df_laudos_pd = df_laudos_pd.drop(columns=['hr_procedimento_realizado', 'hr_segundos'])
+# Remover colunas auxiliares
+df_laudos_pd = df_laudos_pd.drop(columns=['dt_procedimento_realizado', 'hr_procedimento_realizado', 'hr_segundos'])
 
 # Converter para Spark DataFrame
 df_laudos = spark.createDataFrame(df_laudos_pd)
@@ -381,7 +381,7 @@ print(f"   - Total de laudos: {count_depois:,}")
 print(f"   - Accession Numbers únicos: {df_laudos.select('accession_number').distinct().count():,}")
 print(f"   - Procedimentos distintos: {df_laudos.select('cd_procedimento').distinct().count()}")
 print(f"   - Pacientes distintos: {df_laudos.select('cd_paciente').distinct().count():,}")
-print(f"   - Período: {df_laudos.agg(min('dt_procedimento_realizado'), max('dt_procedimento_realizado')).collect()[0]}")
+print(f"   - Período: {df_laudos.agg(min('tms_procedimento_realizado'), max('tms_procedimento_realizado')).collect()[0]}")
 
 # Distribuição por procedimento
 print("\n📋 Distribuição por procedimento (Top 10):")

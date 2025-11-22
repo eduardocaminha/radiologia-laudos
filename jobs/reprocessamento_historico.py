@@ -330,12 +330,12 @@ for i in range(num_lotes):
         # Combinar data + hora em timestamp
         # HR_PROCEDIMENTO_REALIZADO está em segundos desde meia-noite
         import pandas as pd
-        df_laudos_pd['dt_procedimento_realizado'] = pd.to_datetime(df_laudos_pd['dt_procedimento_realizado'])
+        df_laudos_pd['tms_procedimento_realizado'] = pd.to_datetime(df_laudos_pd['dt_procedimento_realizado'])
         df_laudos_pd['hr_segundos'] = pd.to_numeric(df_laudos_pd['hr_procedimento_realizado'], errors='coerce').fillna(0)
-        df_laudos_pd['dt_procedimento_realizado'] = df_laudos_pd['dt_procedimento_realizado'] + pd.to_timedelta(df_laudos_pd['hr_segundos'], unit='s')
+        df_laudos_pd['tms_procedimento_realizado'] = df_laudos_pd['tms_procedimento_realizado'] + pd.to_timedelta(df_laudos_pd['hr_segundos'], unit='s')
         
-        # Remover coluna auxiliar
-        df_laudos_pd = df_laudos_pd.drop(columns=['hr_procedimento_realizado', 'hr_segundos'])
+        # Remover colunas auxiliares
+        df_laudos_pd = df_laudos_pd.drop(columns=['dt_procedimento_realizado', 'hr_procedimento_realizado', 'hr_segundos'])
         
         df_laudos = spark.createDataFrame(df_laudos_pd)
         
@@ -449,8 +449,8 @@ if not modo_teste and lotes_processados > 0:
             ano_mes,
             COUNT(*) as total_laudos,
             COUNT(DISTINCT accession_number) as laudos_unicos,
-            MIN(dt_procedimento_realizado) as data_min,
-            MAX(dt_procedimento_realizado) as data_max
+            MIN(tms_procedimento_realizado) as data_min,
+            MAX(tms_procedimento_realizado) as data_max
         FROM {TABLE_LAUDOS_BRONZE}
         WHERE modo_execucao = 'reprocessamento_historico'
           AND DATE(dt_carga) >= '{data_inicio}'

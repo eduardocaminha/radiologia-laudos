@@ -117,7 +117,7 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
     cd_procedimento BIGINT,
     cd_paciente BIGINT,
     ds_laudo_medico STRING,
-    dt_procedimento_realizado TIMESTAMP,  -- Data + hora completa
+    tms_procedimento_realizado TIMESTAMP,  -- Data + hora completa
     fonte STRING,  -- Origem: HSP ou PSC
     ano_mes STRING,  -- Particionamento (YYYY-MM)
     dt_carga TIMESTAMP,  -- Quando foi carregado
@@ -128,7 +128,7 @@ USING DELTA
 ```
 
 **Mudanças no Schema (Nov/2025):**
-- ✅ `dt_procedimento_realizado`: DATE → **TIMESTAMP** (inclui hora)
+- ✅ `tms_procedimento_realizado`: DATE → **TIMESTAMP** (inclui hora)
 - ✅ `fonte`: Nova coluna para identificar origem (**HSP** ou **PSC**)
 - ✅ Schema otimizado: 12 colunas (foco em dados essenciais)
 - ✅ Busca laudos de **HSP + PSC** (UNION ALL)
@@ -268,8 +268,8 @@ ORDER BY dia_carga DESC;
 
 -- Volume por ano/mês (usando função YEAR/MONTH)
 SELECT 
-    YEAR(dt_procedimento_realizado) as ano,
-    MONTH(dt_procedimento_realizado) as mes,
+    YEAR(tms_procedimento_realizado) as ano,
+    MONTH(tms_procedimento_realizado) as mes,
     COUNT(*) as total_laudos
 FROM innovation_dev.bronze.radiologia_laudos_extraidos
 GROUP BY ano, mes
@@ -280,8 +280,8 @@ SELECT
     fonte,
     COUNT(*) as total_laudos,
     COUNT(DISTINCT cd_paciente) as pacientes_unicos,
-    MIN(dt_procedimento_realizado) as primeiro_laudo,
-    MAX(dt_procedimento_realizado) as ultimo_laudo
+    MIN(tms_procedimento_realizado) as primeiro_laudo,
+    MAX(tms_procedimento_realizado) as ultimo_laudo
 FROM innovation_dev.bronze.radiologia_laudos_extraidos
 GROUP BY fonte
 ORDER BY fonte;
@@ -297,7 +297,7 @@ SELECT
     cd_ocorrencia,
     cd_ordem,
     cd_procedimento,
-    dt_procedimento_realizado
+    tms_procedimento_realizado
 FROM innovation_dev.bronze.radiologia_laudos_extraidos
 LIMIT 10;
 
@@ -384,7 +384,7 @@ OPTIMIZE innovation_dev.bronze.radiologia_laudos_extraidos;
 
 -- Z-ORDER para queries por procedimento/data
 OPTIMIZE innovation_dev.bronze.radiologia_laudos_extraidos
-ZORDER BY (accession_number, cd_procedimento, dt_procedimento_realizado);
+ZORDER BY (accession_number, cd_procedimento, tms_procedimento_realizado);
 
 -- Vacuum (remover arquivos antigos > 7 dias)
 VACUUM innovation_dev.bronze.radiologia_laudos_extraidos RETAIN 168 HOURS;
