@@ -523,87 +523,108 @@ def renderizar_dashboard(conn):
     st.markdown("---")
     
     # =====================================================================
-    # TABELAS DETALHADAS
+    # GRÁFICOS - LINHA 3: DESCRIÇÕES (REGIÕES ANATÔMICAS)
     # =====================================================================
     
-    col1, col2 = st.columns(2)
+    st.subheader("🏷️ Top 10 Descrições (Regiões Anatômicas)")
     
-    with col1:
-        st.subheader("📋 Detalhamento por Modalidade")
-        
-        # Query sempre precisa de JOIN com modalidades
-        query_detalhamento = f"""
-        SELECT 
-            m.nome_modalidade as Modalidade,
-            COUNT(DISTINCT l.accession_number) as `Total Laudos`,
-            COUNT(DISTINCT l.cd_paciente) as `Pacientes Únicos`,
-            COUNT(DISTINCT l.cd_procedimento) as `Procedimentos Distintos`,
-            ROUND(COUNT(DISTINCT l.accession_number) * 100.0 / SUM(COUNT(DISTINCT l.accession_number)) OVER (), 2) as `% do Total`
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
-        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
-            ON l.cd_procedimento = p.cd_procedimento
-        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
-            ON p.id_modalidade = m.id_modalidade
-        {('LEFT JOIN innovation_dev.gold.radiologia_laudos_descricoes d ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)') if descricoes_selecionadas else ''}
-        WHERE {where_sql}
-          AND p.ativo = TRUE
-          AND m.ativo = TRUE
-          {filtros_adicionais_sql}
-        GROUP BY m.nome_modalidade
-        ORDER BY `Total Laudos` DESC
-        """
-        
-        df_detalhamento = execute_query(conn, query_detalhamento)
-        
-        if len(df_detalhamento) > 0:
-            st.dataframe(
-                df_detalhamento,
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.info("Sem dados de modalidades mapeadas")
+    query_descricoes = f"""
+    SELECT 
+        d.descricao,
+        COUNT(DISTINCT l.accession_number) as total_laudos,
+        COUNT(DISTINCT l.cd_paciente) as pacientes_unicos
+    FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+    INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+        ON l.cd_procedimento = p.cd_procedimento
+    INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+        ON p.id_modalidade = m.id_modalidade
+    INNER JOIN innovation_dev.gold.radiologia_laudos_descricoes d
+        ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, 
+                              p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)
+    WHERE {where_sql}
+      AND p.ativo = TRUE
+      AND m.ativo = TRUE
+      AND d.ativo = TRUE
+      {' AND ' + ' AND '.join(filtros_adicionais) if filtros_adicionais else ''}
+    GROUP BY d.descricao
+    ORDER BY total_laudos DESC
+    LIMIT 10
+    """
     
-    with col2:
-        st.subheader("🏷️ Detalhamento por Descrição")
+    df_descricoes = execute_query(conn, query_descricoes)
+    
+    if len(df_descricoes) > 0:
+        # Truncar descrições longas
+        df_descricoes['descricao_curta'] = df_descricoes['descricao'].str[:50] + '...'
         
-        # Query para agrupar por descrição (região anatômica/técnica)
-        query_descricoes = f"""
-        SELECT 
-            d.descricao as `Descrição`,
-            COUNT(DISTINCT l.accession_number) as `Total Laudos`,
-            COUNT(DISTINCT l.cd_paciente) as `Pacientes Únicos`,
-            COUNT(DISTINCT l.cd_procedimento) as `Procedimentos Distintos`,
-            ROUND(COUNT(DISTINCT l.accession_number) * 100.0 / SUM(COUNT(DISTINCT l.accession_number)) OVER (), 2) as `% do Total`
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
-        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
-            ON l.cd_procedimento = p.cd_procedimento
-        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
-            ON p.id_modalidade = m.id_modalidade
-        INNER JOIN innovation_dev.gold.radiologia_laudos_descricoes d
-            ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, 
-                                  p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)
-        WHERE {where_sql}
-          AND p.ativo = TRUE
-          AND m.ativo = TRUE
-          AND d.ativo = TRUE
-          {' AND ' + ' AND '.join(filtros_adicionais) if filtros_adicionais else ''}
-        GROUP BY d.descricao
-        ORDER BY `Total Laudos` DESC
-        LIMIT 20
-        """
+        fig_descricoes = px.bar(
+            df_descricoes,
+            x='total_laudos',
+            y='descricao_curta',
+            orientation='h',
+            title='',
+            color='total_laudos',
+            color_continuous_scale='Greens'
+        )
         
-        df_descricoes = execute_query(conn, query_descricoes)
+        fig_descricoes.update_layout(
+            height=400,
+            xaxis_title="Quantidade de Laudos",
+            yaxis_title="",
+            showlegend=False,
+            yaxis={'categoryorder':'total ascending'}
+        )
         
-        if len(df_descricoes) > 0:
-            st.dataframe(
-                df_descricoes,
-                use_container_width=True,
-                hide_index=True
-            )
-            st.caption("💡 Use o filtro 'Descrições' no sidebar para focar em regiões específicas")
-        else:
-            st.info("Sem dados de descrições mapeadas")
+        fig_descricoes.update_traces(
+            hovertemplate='<b>%{customdata[0]}</b><br>Laudos: %{x:,}<extra></extra>',
+            customdata=df_descricoes[['descricao']].values
+        )
+        
+        st.plotly_chart(fig_descricoes, use_container_width=True)
+        st.caption("💡 Use o filtro 'Descrições' no sidebar para focar em regiões específicas")
+    else:
+        st.info("Sem dados de descrições mapeadas")
+    
+    st.markdown("---")
+    
+    # =====================================================================
+    # TABELA DETALHADA POR MODALIDADE
+    # =====================================================================
+    
+    st.subheader("📋 Detalhamento por Modalidade")
+    
+    # Query sempre precisa de JOIN com modalidades
+    query_detalhamento = f"""
+    SELECT 
+        m.nome_modalidade as Modalidade,
+        COUNT(DISTINCT l.accession_number) as `Total Laudos`,
+        COUNT(DISTINCT l.cd_paciente) as `Pacientes Únicos`,
+        COUNT(DISTINCT l.cd_procedimento) as `Procedimentos Distintos`,
+        ROUND(COUNT(DISTINCT l.accession_number) * 100.0 / SUM(COUNT(DISTINCT l.accession_number)) OVER (), 2) as `% do Total`
+    FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+    INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+        ON l.cd_procedimento = p.cd_procedimento
+    INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+        ON p.id_modalidade = m.id_modalidade
+    {('LEFT JOIN innovation_dev.gold.radiologia_laudos_descricoes d ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)') if descricoes_selecionadas else ''}
+    WHERE {where_sql}
+      AND p.ativo = TRUE
+      AND m.ativo = TRUE
+      {filtros_adicionais_sql}
+    GROUP BY m.nome_modalidade
+    ORDER BY `Total Laudos` DESC
+    """
+    
+    df_detalhamento = execute_query(conn, query_detalhamento)
+    
+    if len(df_detalhamento) > 0:
+        st.dataframe(
+            df_detalhamento,
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Sem dados de modalidades mapeadas")
     
     st.markdown("---")
     
