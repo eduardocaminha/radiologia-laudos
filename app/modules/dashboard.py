@@ -158,14 +158,6 @@ def renderizar_dashboard(conn):
     
     df_kpis = execute_query(conn, query_kpis)
     
-    # Query para total geral (sem filtros de modalidade/descrição) para comparação
-    query_total_geral = f"""
-    SELECT COUNT(DISTINCT accession_number) as total_geral
-    FROM innovation_dev.bronze.radiologia_laudos_extraidos
-    WHERE {where_sql}
-    """
-    df_total_geral = execute_query(conn, query_total_geral)
-    
     if len(df_kpis) > 0:
         kpi = df_kpis.iloc[0]
         
@@ -202,20 +194,6 @@ def renderizar_dashboard(conn):
         
         # Período dos dados
         st.caption(f"📅 Período: {kpi['data_min']} até {kpi['data_max']}")
-        
-        # Aviso sobre cobertura de mapeamento
-        if len(df_total_geral) > 0:
-            total_geral = df_total_geral.iloc[0]['total_geral']
-            total_filtrado = kpi['total_laudos']
-            
-            if total_geral > total_filtrado:
-                cobertura_pct = (total_filtrado / total_geral * 100) if total_geral > 0 else 0
-                laudos_nao_mapeados = total_geral - total_filtrado
-                
-                if filtros_adicionais_sql:
-                    st.warning(f"⚠️ **Filtros ativos**: Mostrando {total_filtrado:,} de {total_geral:,} laudos ({cobertura_pct:.1f}%). {laudos_nao_mapeados:,} laudos não atendem aos filtros ou não estão mapeados.")
-                else:
-                    st.warning(f"⚠️ **Cobertura de mapeamento**: {total_filtrado:,} de {total_geral:,} laudos estão mapeados ({cobertura_pct:.1f}%). {laudos_nao_mapeados:,} laudos ainda não têm procedimentos cadastrados nas tabelas Gold.")
     
     st.markdown("---")
     
@@ -242,28 +220,32 @@ def renderizar_dashboard(conn):
         df_volume = execute_query(conn, query_volume_dia)
         
         if len(df_volume) > 0:
-            # Converter coluna data para datetime
+            # Preencher dias faltantes com 0
             df_volume['data'] = pd.to_datetime(df_volume['data'])
             
-            # Criar range completo de datas para preencher gaps
+            # Criar range completo de datas
             data_min = df_volume['data'].min()
             data_max = df_volume['data'].max()
             date_range = pd.date_range(start=data_min, end=data_max, freq='D')
             
-            # Reindexar para incluir todas as datas
-            df_volume_completo = df_volume.set_index('data').reindex(date_range, fill_value=0).reset_index()
-            df_volume_completo.columns = ['data', 'total_laudos', 'pacientes']
+            # Criar DataFrame com todas as datas
+            df_completo = pd.DataFrame({'data': date_range})
+            
+            # Merge com dados reais, preenchendo com 0 onde não há dados
+            df_volume = df_completo.merge(df_volume, on='data', how='left')
+            df_volume['total_laudos'] = df_volume['total_laudos'].fillna(0).astype(int)
+            df_volume['pacientes'] = df_volume['pacientes'].fillna(0).astype(int)
             
             fig_volume = go.Figure()
             
             fig_volume.add_trace(go.Scatter(
-                x=df_volume_completo['data'],
-                y=df_volume_completo['total_laudos'],
+                x=df_volume['data'],
+                y=df_volume['total_laudos'],
                 mode='lines+markers',
                 name='Laudos',
                 line=dict(color='#1f77b4', width=2),
                 marker=dict(size=6),
-                connectgaps=False  # Não conectar gaps (dias sem dados)
+                connectgaps=False  # Não conectar gaps (mostra 0)
             ))
             
             fig_volume.update_layout(
@@ -275,11 +257,6 @@ def renderizar_dashboard(conn):
             )
             
             st.plotly_chart(fig_volume, use_container_width=True)
-            
-            # Mostrar dias sem dados se houver
-            dias_sem_dados = df_volume_completo[df_volume_completo['total_laudos'] == 0]
-            if len(dias_sem_dados) > 0:
-                st.caption(f"⚠️ {len(dias_sem_dados)} dia(s) sem laudos no período: {', '.join(dias_sem_dados['data'].dt.strftime('%d/%m').tolist())}")
         else:
             st.info("Sem dados para o período selecionado")
     
