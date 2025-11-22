@@ -11,14 +11,15 @@ CREATE TABLE IF NOT EXISTS innovation_dev.gold.radiologia_laudos_modo_execucao (
     codigo STRING NOT NULL,
     nome STRING NOT NULL,
     descricao STRING,
-    ativo BOOLEAN DEFAULT TRUE,
-    dt_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
+    ativo BOOLEAN,
+    dt_criacao TIMESTAMP,
     dt_atualizacao TIMESTAMP
 ) USING DELTA
 COMMENT 'Tabela de domínio para valores válidos de modo_execucao';
 
--- Nota: Delta Lake não suporta UNIQUE constraints nativamente
--- A unicidade é garantida pela lógica de inserção (MERGE ou validação prévia)
+-- Nota: Delta Lake não suporta UNIQUE constraints e DEFAULT values nativamente
+-- A unicidade é garantida pela lógica de inserção (MERGE)
+-- Valores padrão são definidos explicitamente no MERGE
 
 -- 2. Inserir valores padrão (usando MERGE para evitar duplicatas)
 MERGE INTO innovation_dev.gold.radiologia_laudos_modo_execucao AS target
