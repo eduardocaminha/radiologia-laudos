@@ -13,18 +13,26 @@ CREATE TABLE IF NOT EXISTS innovation_dev.gold.radiologia_laudos_modo_execucao (
     descricao STRING,
     ativo BOOLEAN DEFAULT TRUE,
     dt_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-    dt_atualizacao TIMESTAMP,
-    CONSTRAINT pk_modo_execucao PRIMARY KEY (id_modo_execucao),
-    CONSTRAINT uk_modo_execucao_codigo UNIQUE (codigo)
+    dt_atualizacao TIMESTAMP
 ) USING DELTA
 COMMENT 'Tabela de domínio para valores válidos de modo_execucao';
 
--- 2. Inserir valores padrão
-INSERT INTO innovation_dev.gold.radiologia_laudos_modo_execucao 
-(id_modo_execucao, codigo, nome, descricao, ativo, dt_criacao, dt_atualizacao)
-VALUES
-(1, 'job_diario', 'Job Diário', 'Extração diária automática (D-1) executada pelo job agendado', TRUE, CURRENT_TIMESTAMP(), NULL),
-(2, 'reprocessamento_historico', 'Reprocessamento Histórico', 'Reprocessamento de períodos anteriores em lotes semanais', TRUE, CURRENT_TIMESTAMP(), NULL);
+-- Nota: Delta Lake não suporta UNIQUE constraints nativamente
+-- A unicidade é garantida pela lógica de inserção (MERGE ou validação prévia)
+
+-- 2. Inserir valores padrão (usando MERGE para evitar duplicatas)
+MERGE INTO innovation_dev.gold.radiologia_laudos_modo_execucao AS target
+USING (
+    SELECT 1 AS id_modo_execucao, 'job_diario' AS codigo, 'Job Diário' AS nome, 
+           'Extração diária automática (D-1) executada pelo job agendado' AS descricao
+    UNION ALL
+    SELECT 2, 'reprocessamento_historico', 'Reprocessamento Histórico',
+           'Reprocessamento de períodos anteriores em lotes semanais'
+) AS source
+ON target.id_modo_execucao = source.id_modo_execucao
+WHEN NOT MATCHED THEN
+    INSERT (id_modo_execucao, codigo, nome, descricao, ativo, dt_criacao, dt_atualizacao)
+    VALUES (source.id_modo_execucao, source.codigo, source.nome, source.descricao, TRUE, CURRENT_TIMESTAMP(), NULL);
 
 -- 3. Verificar valores inseridos
 SELECT * FROM innovation_dev.gold.radiologia_laudos_modo_execucao ORDER BY id_modo_execucao;
