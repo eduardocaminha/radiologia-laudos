@@ -187,7 +187,7 @@ O job roda automaticamente às **02:00 AM** (horário de Brasília) processando 
 1. Jobs → `radiologia_extracao_laudos_diaria`
 2. Run Now
 3. (Opcional) Sobrescrever parâmetros:
-   - `data_processamento`: `2024-01-15`
+   - `dt_processamento`: `2024-01-15`
    - `modo_execucao`: `reprocessamento_historico`
    - `dias_retroativos`: `7`
 
@@ -199,7 +199,7 @@ databricks jobs run-now --job-id <JOB_ID>
 # Reprocessamento de período específico
 databricks jobs run-now --job-id <JOB_ID> \
   --notebook-params '{
-    "data_processamento": "2024-01-15",
+    "dt_processamento": "2024-01-15",
     "modo_execucao": "reprocessamento_historico",
     "dias_retroativos": "7"
   }'
@@ -233,17 +233,17 @@ dias_retroativos = 7  # últimos 7 dias
 O job salva métricas em:
 ```sql
 SELECT * FROM innovation_dev.bronze.radiologia_laudos_metricas_job
-ORDER BY dt_execucao DESC
+ORDER BY tms_execucao DESC
 ```
 
 **Campos:**
-- `data_processamento`: Data de referência
+- `dt_processamento`: Data de referência (DATE)
 - `periodo_inicio` / `periodo_fim`: Período extraído
 - `procedimentos_ativos`: Quantidade de procedimentos na lista
 - `procedimentos_realizados`: Procedimentos encontrados no Oracle
 - `laudos_extraidos`: Laudos salvos no Bronze
 - `total_bronze`: Total acumulado na tabela Bronze
-- `dt_execucao`: Timestamp da execução
+- `tms_execucao`: Timestamp da execução
 
 ### Queries de Monitoramento
 
@@ -251,7 +251,7 @@ ORDER BY dt_execucao DESC
 -- Verificar última execução
 SELECT * 
 FROM innovation_dev.bronze.radiologia_laudos_metricas_job
-ORDER BY dt_execucao DESC
+ORDER BY tms_execucao DESC
 LIMIT 1;
 
 -- Volume por dia de carga
@@ -396,7 +396,7 @@ VACUUM innovation_dev.bronze.radiologia_laudos_extraidos RETAIN 168 HOURS;
 # Reprocessar últimos 30 dias
 databricks jobs run-now --job-id <JOB_ID> \
   --notebook-params '{
-    "data_processamento": "2024-01-31",
+    "dt_processamento": "2024-01-31",
     "modo_execucao": "reprocessamento_historico",
     "dias_retroativos": "30"
   }'
@@ -534,7 +534,7 @@ modo_teste: true       # ← Apenas mostra estatísticas
    - Via CLI: `databricks jobs create --json-file jobs/job_config.yaml`
 
 3. **Configurar widgets (deixar vazios para automático):**
-   - `data_processamento`: *vazio* (calcula D-1)
+   - `dt_processamento`: *vazio* (calcula D-1)
    - `modo_execucao`: `job_diario`
    - `dias_retroativos`: `1`
 
@@ -542,7 +542,7 @@ modo_teste: true       # ← Apenas mostra estatísticas
 
 ```python
 # Configure os widgets:
-data_processamento: 2025-11-18  # Dia específico
+dt_processamento: 2025-11-18  # Dia específico
 modo_execucao: job_diario
 dias_retroativos: 1
 
@@ -561,7 +561,7 @@ LIMIT 10;
 -- Ver métricas
 SELECT * 
 FROM innovation_dev.bronze.radiologia_laudos_metricas_job
-ORDER BY dt_execucao DESC
+ORDER BY tms_execucao DESC
 LIMIT 5;
 
 -- Verificar duplicatas (deve estar vazio!)

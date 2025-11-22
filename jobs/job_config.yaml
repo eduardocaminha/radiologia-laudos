@@ -41,7 +41,7 @@ tasks:
       notebook_path: "/Workspace/Repos/radiologia-laudos/jobs/extracao_laudos_diaria"
       base_parameters:
         # Parâmetros padrão (podem ser sobrescritos em execuções manuais)
-        data_processamento: ""  # Vazio = D-1 automático
+        dt_processamento: ""  # Vazio = D-1 automático
         modo_execucao: "job_diario"
         dias_retroativos: "1"
     

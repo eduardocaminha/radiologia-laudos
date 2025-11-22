@@ -36,12 +36,12 @@ import pandas as pd
 # COMMAND ----------
 
 # Widgets para parametrização
-dbutils.widgets.text("data_processamento", "", "Data Processamento (YYYY-MM-DD)")
+dbutils.widgets.text("dt_processamento", "", "Data Processamento (YYYY-MM-DD)")
 dbutils.widgets.dropdown("modo_execucao", "job_diario", ["job_diario", "reprocessamento_historico"], "Modo Execução")
 dbutils.widgets.text("dias_retroativos", "1", "Dias Retroativos (reprocessamento_historico)")
 
 # Obter parâmetros
-data_param = dbutils.widgets.get("data_processamento")
+data_param = dbutils.widgets.get("dt_processamento")
 modo_execucao = dbutils.widgets.get("modo_execucao")
 dias_retroativos = int(dbutils.widgets.get("dias_retroativos"))
 
@@ -475,7 +475,7 @@ total_bronze = spark.sql(f"SELECT COUNT(*) as total FROM {TABLE_LAUDOS_BRONZE}")
 
 # Métricas do processamento atual
 metricas = {
-    'data_processamento': str(data_processamento),
+    'dt_processamento': str(data_processamento),
     'periodo_inicio': str(data_inicio),
     'periodo_fim': str(data_fim),
     'modo_execucao': modo_execucao,
@@ -483,7 +483,7 @@ metricas = {
     'procedimentos_realizados': int(total_procedimentos),
     'laudos_extraidos': int(count_depois),  # Após remoção de duplicatas
     'total_bronze': int(total_bronze),
-    'dt_execucao': datetime.now().isoformat()
+    'tms_execucao': datetime.now().isoformat()
 }
 
 # Exibir métricas
