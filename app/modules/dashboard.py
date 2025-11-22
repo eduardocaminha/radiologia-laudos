@@ -222,15 +222,18 @@ def renderizar_dashboard(conn):
         
         query_modalidades = f"""
         SELECT 
-            p.nome_modalidade,
+            m.nome_modalidade,
             COUNT(*) as total_laudos,
             COUNT(DISTINCT l.cd_paciente) as pacientes_unicos
         FROM innovation_dev.bronze.radiologia_laudos_extraidos l
         INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
             ON l.cd_procedimento = p.cd_procedimento
+        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+            ON p.id_modalidade = m.id_modalidade
         WHERE {where_sql}
           AND p.ativo = TRUE
-        GROUP BY p.nome_modalidade
+          AND m.ativo = TRUE
+        GROUP BY m.nome_modalidade
         ORDER BY total_laudos DESC
         LIMIT 10
         """
@@ -270,7 +273,7 @@ def renderizar_dashboard(conn):
         query_procedimentos = f"""
         SELECT 
             p.cd_procedimento,
-            p.nome_procedimento,
+            p.nm_procedimento,
             COUNT(*) as total_laudos,
             COUNT(DISTINCT l.cd_paciente) as pacientes_unicos
         FROM innovation_dev.bronze.radiologia_laudos_extraidos l
@@ -278,7 +281,7 @@ def renderizar_dashboard(conn):
             ON l.cd_procedimento = p.cd_procedimento
         WHERE {where_sql}
           AND p.ativo = TRUE
-        GROUP BY p.cd_procedimento, p.nome_procedimento
+        GROUP BY p.cd_procedimento, p.nm_procedimento
         ORDER BY total_laudos DESC
         LIMIT 10
         """
@@ -287,7 +290,7 @@ def renderizar_dashboard(conn):
         
         if len(df_procedimentos) > 0:
             # Truncar nomes longos
-            df_procedimentos['nome_curto'] = df_procedimentos['nome_procedimento'].str[:50] + '...'
+            df_procedimentos['nome_curto'] = df_procedimentos['nm_procedimento'].str[:50] + '...'
             
             fig_procedimentos = px.bar(
                 df_procedimentos,
@@ -309,7 +312,7 @@ def renderizar_dashboard(conn):
             
             fig_procedimentos.update_traces(
                 hovertemplate='<b>%{customdata[0]}</b><br>Código: %{customdata[1]}<br>Laudos: %{x:,}<extra></extra>',
-                customdata=df_procedimentos[['nome_procedimento', 'cd_procedimento']].values
+                customdata=df_procedimentos[['nm_procedimento', 'cd_procedimento']].values
             )
             
             st.plotly_chart(fig_procedimentos, use_container_width=True)
@@ -429,7 +432,7 @@ def renderizar_dashboard(conn):
     
     query_detalhamento = f"""
     SELECT 
-        p.nome_modalidade as Modalidade,
+        m.nome_modalidade as Modalidade,
         COUNT(*) as `Total Laudos`,
         COUNT(DISTINCT l.cd_paciente) as `Pacientes Únicos`,
         COUNT(DISTINCT l.cd_procedimento) as `Procedimentos Distintos`,
@@ -437,9 +440,12 @@ def renderizar_dashboard(conn):
     FROM innovation_dev.bronze.radiologia_laudos_extraidos l
     INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
         ON l.cd_procedimento = p.cd_procedimento
+    INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+        ON p.id_modalidade = m.id_modalidade
     WHERE {where_sql}
       AND p.ativo = TRUE
-    GROUP BY p.nome_modalidade
+      AND m.ativo = TRUE
+    GROUP BY m.nome_modalidade
     ORDER BY `Total Laudos` DESC
     """
     
