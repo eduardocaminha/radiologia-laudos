@@ -16,6 +16,7 @@ from database import (
     execute_query
 )
 from modules import (
+    renderizar_dashboard,
     renderizar_pagina_modalidades,
     renderizar_pagina_descricoes,
     renderizar_pagina_procedimentos,
@@ -97,7 +98,7 @@ st.sidebar.header("Navegação")
 
 pagina = st.sidebar.radio(
     "Selecione a página:",
-    ["🏠 Início", "🏷️ Modalidades", "📝 Descrições", "🔬 Procedimentos", "📊 Importar CSV"],
+    ["📊 Dashboard", "🏷️ Modalidades", "📝 Descrições", "🔬 Procedimentos", "📥 Importar CSV"],
     key="navegacao"
 )
 
@@ -105,53 +106,8 @@ pagina = st.sidebar.radio(
 # PÁGINAS
 # =====================================================================
 
-if pagina == "🏠 Início":
-    st.markdown("""
-    ## Bem-vindo ao Sistema de Organização de Laudos
-    
-    Este aplicativo permite gerenciar procedimentos radiológicos no Delta Lake (camada Gold).
-    
-    ### Funcionalidades:
-    
-    - **🏷️ Modalidades**: Gerenciar catálogo de modalidades (TC, ANGIOTC, RM, etc.)
-    - **📝 Descrições**: Gerenciar catálogo de descrições anatômicas/técnicas
-    - **🔬 Procedimentos**: Adicionar procedimentos vinculando modalidade e descrições
-      - Entrada manual
-      - Busca por código no Oracle Lake
-      - Busca por termo no Oracle Lake
-    - **📊 Importar CSV**: Carga inicial a partir do arquivo procedimentos.csv
-    
-    ### Tabelas Gold:
-    - `{TABLE_MODALIDADES}`
-    - `{TABLE_DESCRICOES}`
-    - `{TABLE_PROCEDIMENTOS}`
-    
-    👈 Use o menu lateral para navegar entre as páginas.
-    """)
-    
-    # Estatísticas rápidas
-    st.markdown("---")
-    st.subheader("📊 Estatísticas Rápidas")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        query_modalidades = f"SELECT COUNT(*) as total FROM {TABLE_MODALIDADES} WHERE ativo = TRUE"
-        df_modal = execute_query(conn, query_modalidades)
-        total_modalidades = df_modal['total'].iloc[0] if len(df_modal) > 0 else 0
-        st.metric("Modalidades Ativas", total_modalidades)
-    
-    with col2:
-        query_descricoes = f"SELECT COUNT(*) as total FROM {TABLE_DESCRICOES} WHERE ativo = TRUE"
-        df_desc = execute_query(conn, query_descricoes)
-        total_descricoes = df_desc['total'].iloc[0] if len(df_desc) > 0 else 0
-        st.metric("Descrições Ativas", total_descricoes)
-    
-    with col3:
-        query_procedimentos = f"SELECT COUNT(*) as total FROM {TABLE_PROCEDIMENTOS} WHERE ativo = TRUE"
-        df_proc = execute_query(conn, query_procedimentos)
-        total_procedimentos = df_proc['total'].iloc[0] if len(df_proc) > 0 else 0
-        st.metric("Procedimentos Ativos", total_procedimentos)
+if pagina == "📊 Dashboard":
+    renderizar_dashboard(conn)
 
 elif pagina == "🏷️ Modalidades":
     renderizar_pagina_modalidades(conn)
@@ -162,5 +118,5 @@ elif pagina == "📝 Descrições":
 elif pagina == "🔬 Procedimentos":
     renderizar_pagina_procedimentos(conn)
 
-elif pagina == "📊 Importar CSV":
+elif pagina == "📥 Importar CSV":
     renderizar_pagina_importar_csv(conn)
