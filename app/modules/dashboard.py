@@ -52,7 +52,43 @@ def renderizar_dashboard(conn):
         st.warning("⚠️ Selecione pelo menos uma fonte")
         return
     
-    # Construir WHERE clause
+    # Carregar modalidades disponíveis
+    query_modalidades_disponiveis = """
+    SELECT DISTINCT nome_modalidade 
+    FROM innovation_dev.gold.radiologia_laudos_modalidades
+    WHERE ativo = TRUE
+    ORDER BY nome_modalidade
+    """
+    df_modalidades_disponiveis = execute_query(conn, query_modalidades_disponiveis)
+    modalidades_disponiveis = df_modalidades_disponiveis['nome_modalidade'].tolist() if len(df_modalidades_disponiveis) > 0 else []
+    
+    # Filtro de modalidades
+    modalidades_selecionadas = st.sidebar.multiselect(
+        "Modalidades:",
+        modalidades_disponiveis,
+        default=modalidades_disponiveis,
+        help="Filtrar por tipo de exame (TC, RM, etc.)"
+    )
+    
+    # Carregar descrições disponíveis
+    query_descricoes_disponiveis = """
+    SELECT DISTINCT descricao 
+    FROM innovation_dev.gold.radiologia_laudos_descricoes
+    WHERE ativo = TRUE
+    ORDER BY descricao
+    """
+    df_descricoes_disponiveis = execute_query(conn, query_descricoes_disponiveis)
+    descricoes_disponiveis = df_descricoes_disponiveis['descricao'].tolist() if len(df_descricoes_disponiveis) > 0 else []
+    
+    # Filtro de descrições
+    descricoes_selecionadas = st.sidebar.multiselect(
+        "Descrições:",
+        descricoes_disponiveis,
+        default=[],
+        help="Filtrar por região anatômica ou técnica (ex: ABDOME SUPERIOR, CRANIO, etc.)"
+    )
+    
+    # Construir WHERE clause base
     where_clauses = []
     
     if dias_filtro:
@@ -65,6 +101,42 @@ def renderizar_dashboard(conn):
     
     where_sql = " AND ".join(where_clauses)
     
+    # Construir filtros adicionais para modalidades e descrições
+    filtros_adicionais = []
+    
+    if modalidades_selecionadas and len(modalidades_selecionadas) < len(modalidades_disponiveis):
+        modalidades_quoted = [f"'{m}'" for m in modalidades_selecionadas]
+        modalidades_in = ','.join(modalidades_quoted)
+        filtros_adicionais.append(f"m.nome_modalidade IN ({modalidades_in})")
+    
+    if descricoes_selecionadas:
+        descricoes_quoted = [f"'{d}'" for d in descricoes_selecionadas]
+        descricoes_in = ','.join(descricoes_quoted)
+        filtros_adicionais.append(f"d.descricao IN ({descricoes_in})")
+    
+    filtros_adicionais_sql = " AND " + " AND ".join(filtros_adicionais) if filtros_adicionais else ""
+    
+    # Construir query base com JOINs (se houver filtros de modalidade ou descrição)
+    if filtros_adicionais_sql:
+        # Precisa fazer JOIN com as tabelas Gold
+        from_clause = """
+        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+            ON l.cd_procedimento = p.cd_procedimento
+        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+            ON p.id_modalidade = m.id_modalidade
+        LEFT JOIN innovation_dev.gold.radiologia_laudos_descricoes d
+            ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, 
+                                  p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)
+        """
+        where_clause_completo = f"WHERE {where_sql} AND p.ativo = TRUE AND m.ativo = TRUE{filtros_adicionais_sql}"
+        alias_tabela = "l"
+    else:
+        # Sem filtros adicionais, query simples
+        from_clause = "FROM innovation_dev.bronze.radiologia_laudos_extraidos l"
+        where_clause_completo = f"WHERE {where_sql}"
+        alias_tabela = "l"
+    
     # =====================================================================
     # MÉTRICAS PRINCIPAIS (KPIs)
     # =====================================================================
@@ -73,15 +145,15 @@ def renderizar_dashboard(conn):
     
     query_kpis = f"""
     SELECT 
-        COUNT(*) as total_laudos,
-        COUNT(DISTINCT accession_number) as laudos_unicos,
-        COUNT(DISTINCT cd_paciente) as pacientes_unicos,
-        COUNT(DISTINCT cd_procedimento) as procedimentos_distintos,
-        COUNT(DISTINCT DATE(tms_procedimento_realizado)) as dias_com_dados,
-        MIN(tms_procedimento_realizado) as data_min,
-        MAX(tms_procedimento_realizado) as data_max
-    FROM innovation_dev.bronze.radiologia_laudos_extraidos
-    WHERE {where_sql}
+        COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
+        COUNT(DISTINCT {alias_tabela}.accession_number) as laudos_unicos,
+        COUNT(DISTINCT {alias_tabela}.cd_paciente) as pacientes_unicos,
+        COUNT(DISTINCT {alias_tabela}.cd_procedimento) as procedimentos_distintos,
+        COUNT(DISTINCT DATE({alias_tabela}.tms_procedimento_realizado)) as dias_com_dados,
+        MIN({alias_tabela}.tms_procedimento_realizado) as data_min,
+        MAX({alias_tabela}.tms_procedimento_realizado) as data_max
+    {from_clause}
+    {where_clause_completo}
     """
     
     df_kpis = execute_query(conn, query_kpis)
@@ -136,11 +208,11 @@ def renderizar_dashboard(conn):
         
         query_volume_dia = f"""
         SELECT 
-            DATE(tms_procedimento_realizado) as data,
-            COUNT(*) as total_laudos,
-            COUNT(DISTINCT cd_paciente) as pacientes
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos
-        WHERE {where_sql}
+            DATE({alias_tabela}.tms_procedimento_realizado) as data,
+            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
+            COUNT(DISTINCT {alias_tabela}.cd_paciente) as pacientes
+        {from_clause}
+        {where_clause_completo}
         GROUP BY data
         ORDER BY data
         """
@@ -176,13 +248,13 @@ def renderizar_dashboard(conn):
         
         query_fonte = f"""
         SELECT 
-            fonte,
-            COUNT(*) as total_laudos,
-            COUNT(DISTINCT cd_paciente) as pacientes,
-            COUNT(DISTINCT cd_procedimento) as procedimentos
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos
-        WHERE {where_sql}
-        GROUP BY fonte
+            {alias_tabela}.fonte,
+            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
+            COUNT(DISTINCT {alias_tabela}.cd_paciente) as pacientes,
+            COUNT(DISTINCT {alias_tabela}.cd_procedimento) as procedimentos
+        {from_clause}
+        {where_clause_completo}
+        GROUP BY {alias_tabela}.fonte
         ORDER BY total_laudos DESC
         """
         
@@ -223,16 +295,10 @@ def renderizar_dashboard(conn):
         query_modalidades = f"""
         SELECT 
             m.nome_modalidade,
-            COUNT(*) as total_laudos,
-            COUNT(DISTINCT l.cd_paciente) as pacientes_unicos
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
-        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
-            ON l.cd_procedimento = p.cd_procedimento
-        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
-            ON p.id_modalidade = m.id_modalidade
-        WHERE {where_sql}
-          AND p.ativo = TRUE
-          AND m.ativo = TRUE
+            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
+            COUNT(DISTINCT {alias_tabela}.cd_paciente) as pacientes_unicos
+        {from_clause}
+        {where_clause_completo}
         GROUP BY m.nome_modalidade
         ORDER BY total_laudos DESC
         LIMIT 10
@@ -274,13 +340,10 @@ def renderizar_dashboard(conn):
         SELECT 
             p.cd_procedimento,
             p.nm_procedimento,
-            COUNT(*) as total_laudos,
-            COUNT(DISTINCT l.cd_paciente) as pacientes_unicos
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
-        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
-            ON l.cd_procedimento = p.cd_procedimento
-        WHERE {where_sql}
-          AND p.ativo = TRUE
+            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
+            COUNT(DISTINCT {alias_tabela}.cd_paciente) as pacientes_unicos
+        {from_clause}
+        {where_clause_completo}
         GROUP BY p.cd_procedimento, p.nm_procedimento
         ORDER BY total_laudos DESC
         LIMIT 10
@@ -332,8 +395,8 @@ def renderizar_dashboard(conn):
         
         query_dia_semana = f"""
         SELECT 
-            DAYOFWEEK(tms_procedimento_realizado) as dia_num,
-            CASE DAYOFWEEK(tms_procedimento_realizado)
+            DAYOFWEEK({alias_tabela}.tms_procedimento_realizado) as dia_num,
+            CASE DAYOFWEEK({alias_tabela}.tms_procedimento_realizado)
                 WHEN 1 THEN 'Domingo'
                 WHEN 2 THEN 'Segunda'
                 WHEN 3 THEN 'Terça'
@@ -342,10 +405,10 @@ def renderizar_dashboard(conn):
                 WHEN 6 THEN 'Sexta'
                 WHEN 7 THEN 'Sábado'
             END as dia_semana,
-            COUNT(*) as total_laudos,
-            AVG(COUNT(*)) OVER () as media
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos
-        WHERE {where_sql}
+            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
+            AVG(COUNT(DISTINCT {alias_tabela}.accession_number)) OVER () as media
+        {from_clause}
+        {where_clause_completo}
         GROUP BY dia_num
         ORDER BY dia_num
         """
@@ -387,10 +450,10 @@ def renderizar_dashboard(conn):
         
         query_hora = f"""
         SELECT 
-            HOUR(tms_procedimento_realizado) as hora,
-            COUNT(*) as total_laudos
-        FROM innovation_dev.bronze.radiologia_laudos_extraidos
-        WHERE {where_sql}
+            HOUR({alias_tabela}.tms_procedimento_realizado) as hora,
+            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos
+        {from_clause}
+        {where_clause_completo}
         GROUP BY hora
         ORDER BY hora
         """
@@ -428,37 +491,75 @@ def renderizar_dashboard(conn):
     # TABELAS DETALHADAS
     # =====================================================================
     
-    st.subheader("📋 Detalhamento por Modalidade")
+    col1, col2 = st.columns(2)
     
-    query_detalhamento = f"""
-    SELECT 
-        m.nome_modalidade as Modalidade,
-        COUNT(*) as `Total Laudos`,
-        COUNT(DISTINCT l.cd_paciente) as `Pacientes Únicos`,
-        COUNT(DISTINCT l.cd_procedimento) as `Procedimentos Distintos`,
-        ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as `% do Total`
-    FROM innovation_dev.bronze.radiologia_laudos_extraidos l
-    INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
-        ON l.cd_procedimento = p.cd_procedimento
-    INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
-        ON p.id_modalidade = m.id_modalidade
-    WHERE {where_sql}
-      AND p.ativo = TRUE
-      AND m.ativo = TRUE
-    GROUP BY m.nome_modalidade
-    ORDER BY `Total Laudos` DESC
-    """
+    with col1:
+        st.subheader("📋 Detalhamento por Modalidade")
+        
+        query_detalhamento = f"""
+        SELECT 
+            m.nome_modalidade as Modalidade,
+            COUNT(DISTINCT {alias_tabela}.accession_number) as `Total Laudos`,
+            COUNT(DISTINCT {alias_tabela}.cd_paciente) as `Pacientes Únicos`,
+            COUNT(DISTINCT {alias_tabela}.cd_procedimento) as `Procedimentos Distintos`,
+            ROUND(COUNT(DISTINCT {alias_tabela}.accession_number) * 100.0 / SUM(COUNT(DISTINCT {alias_tabela}.accession_number)) OVER (), 2) as `% do Total`
+        {from_clause}
+        {where_clause_completo}
+        GROUP BY m.nome_modalidade
+        ORDER BY `Total Laudos` DESC
+        """
+        
+        df_detalhamento = execute_query(conn, query_detalhamento)
+        
+        if len(df_detalhamento) > 0:
+            st.dataframe(
+                df_detalhamento,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("Sem dados de modalidades mapeadas")
     
-    df_detalhamento = execute_query(conn, query_detalhamento)
-    
-    if len(df_detalhamento) > 0:
-        st.dataframe(
-            df_detalhamento,
-            use_container_width=True,
-            hide_index=True
-        )
-    else:
-        st.info("Sem dados de modalidades mapeadas")
+    with col2:
+        st.subheader("🏷️ Detalhamento por Descrição")
+        
+        # Query para agrupar por descrição (região anatômica/técnica)
+        query_descricoes = f"""
+        SELECT 
+            d.descricao as Descrição,
+            COUNT(DISTINCT {alias_tabela}.accession_number) as `Total Laudos`,
+            COUNT(DISTINCT {alias_tabela}.cd_paciente) as `Pacientes Únicos`,
+            COUNT(DISTINCT {alias_tabela}.cd_procedimento) as `Procedimentos Distintos`,
+            ROUND(COUNT(DISTINCT {alias_tabela}.accession_number) * 100.0 / SUM(COUNT(DISTINCT {alias_tabela}.accession_number)) OVER (), 2) as `% do Total`
+        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+            ON l.cd_procedimento = p.cd_procedimento
+        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+            ON p.id_modalidade = m.id_modalidade
+        INNER JOIN innovation_dev.gold.radiologia_laudos_descricoes d
+            ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, 
+                                  p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)
+        WHERE {where_sql}
+          AND p.ativo = TRUE
+          AND m.ativo = TRUE
+          AND d.ativo = TRUE
+          {' AND ' + ' AND '.join(filtros_adicionais) if filtros_adicionais else ''}
+        GROUP BY d.descricao
+        ORDER BY `Total Laudos` DESC
+        LIMIT 20
+        """
+        
+        df_descricoes = execute_query(conn, query_descricoes)
+        
+        if len(df_descricoes) > 0:
+            st.dataframe(
+                df_descricoes,
+                use_container_width=True,
+                hide_index=True
+            )
+            st.caption("💡 Use o filtro 'Descrições' no sidebar para focar em regiões específicas")
+        else:
+            st.info("Sem dados de descrições mapeadas")
     
     st.markdown("---")
     
