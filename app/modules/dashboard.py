@@ -158,6 +158,14 @@ def renderizar_dashboard(conn):
     
     df_kpis = execute_query(conn, query_kpis)
     
+    # Query para total geral (sem filtros de modalidade/descrição) para comparação
+    query_total_geral = f"""
+    SELECT COUNT(DISTINCT accession_number) as total_geral
+    FROM innovation_dev.bronze.radiologia_laudos_extraidos
+    WHERE {where_sql}
+    """
+    df_total_geral = execute_query(conn, query_total_geral)
+    
     if len(df_kpis) > 0:
         kpi = df_kpis.iloc[0]
         
@@ -194,6 +202,20 @@ def renderizar_dashboard(conn):
         
         # Período dos dados
         st.caption(f"📅 Período: {kpi['data_min']} até {kpi['data_max']}")
+        
+        # Aviso sobre cobertura de mapeamento
+        if len(df_total_geral) > 0:
+            total_geral = df_total_geral.iloc[0]['total_geral']
+            total_filtrado = kpi['total_laudos']
+            
+            if total_geral > total_filtrado:
+                cobertura_pct = (total_filtrado / total_geral * 100) if total_geral > 0 else 0
+                laudos_nao_mapeados = total_geral - total_filtrado
+                
+                if filtros_adicionais_sql:
+                    st.warning(f"⚠️ **Filtros ativos**: Mostrando {total_filtrado:,} de {total_geral:,} laudos ({cobertura_pct:.1f}%). {laudos_nao_mapeados:,} laudos não atendem aos filtros ou não estão mapeados.")
+                else:
+                    st.warning(f"⚠️ **Cobertura de mapeamento**: {total_filtrado:,} de {total_geral:,} laudos estão mapeados ({cobertura_pct:.1f}%). {laudos_nao_mapeados:,} laudos ainda não têm procedimentos cadastrados nas tabelas Gold.")
     
     st.markdown("---")
     
