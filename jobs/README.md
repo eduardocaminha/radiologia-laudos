@@ -121,7 +121,7 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
     fonte STRING,  -- Origem: HSP ou PSC
     ano_mes STRING,  -- Particionamento (YYYY-MM)
     dt_carga TIMESTAMP,  -- Quando foi carregado
-    modo_execucao STRING  -- Como foi carregado (diario/reprocessamento_historico)
+    modo_execucao STRING  -- Como foi carregado (job_diario/reprocessamento_historico)
 )
 PARTITIONED BY (ano_mes)
 USING DELTA
@@ -146,7 +146,26 @@ USING DELTA
 
 - `fonte`: Origem do laudo (`HSP` = Hospital, `PSC` = Pronto Socorro)
 - `dt_carga`: Timestamp da carga no Delta Lake (quando foi carregado)
-- `modo_execucao`: `job_diario` ou `reprocessamento_historico` (como foi carregado)
+- `modo_execucao`: Valores controlados por tabela de domínio (`job_diario` ou `reprocessamento_historico`)
+
+### Tabela de Domínio: modo_execucao
+
+A coluna `modo_execucao` é validada contra uma tabela de domínio para garantir consistência:
+
+```sql
+-- Tabela: innovation_dev.gold.radiologia_laudos_modo_execucao
+SELECT * FROM innovation_dev.gold.radiologia_laudos_modo_execucao;
+
+-- Valores válidos:
+-- 1. 'job_diario' - Extração diária automática (D-1)
+-- 2. 'reprocessamento_historico' - Reprocessamento de períodos anteriores
+```
+
+**Benefícios:**
+- ✅ Valores padronizados e controlados
+- ✅ Validação automática nos notebooks
+- ✅ Rastreabilidade e auditoria
+- ✅ Fácil adicionar novos modos sem alterar código
 
 ### Controle de Duplicidades
 
@@ -169,7 +188,7 @@ O job roda automaticamente às **02:00 AM** (horário de Brasília) processando 
 2. Run Now
 3. (Opcional) Sobrescrever parâmetros:
    - `data_processamento`: `2024-01-15`
-   - `modo_execucao`: `reprocessamento`
+   - `modo_execucao`: `reprocessamento_historico`
    - `dias_retroativos`: `7`
 
 #### Via CLI
@@ -181,7 +200,7 @@ databricks jobs run-now --job-id <JOB_ID>
 databricks jobs run-now --job-id <JOB_ID> \
   --notebook-params '{
     "data_processamento": "2024-01-15",
-    "modo_execucao": "reprocessamento",
+    "modo_execucao": "reprocessamento_historico",
     "dias_retroativos": "7"
   }'
 ```
@@ -199,7 +218,7 @@ modo_execucao = "job_diario"
 
 ### 2. Reprocessamento
 ```python
-modo_execucao = "reprocessamento"
+modo_execucao = "reprocessamento_historico"
 dias_retroativos = 7  # últimos 7 dias
 ```
 - Processa **múltiplos dias** retroativos
@@ -378,7 +397,7 @@ VACUUM innovation_dev.bronze.radiologia_laudos_extraidos RETAIN 168 HOURS;
 databricks jobs run-now --job-id <JOB_ID> \
   --notebook-params '{
     "data_processamento": "2024-01-31",
-    "modo_execucao": "reprocessamento",
+    "modo_execucao": "reprocessamento_historico",
     "dias_retroativos": "30"
   }'
 ```

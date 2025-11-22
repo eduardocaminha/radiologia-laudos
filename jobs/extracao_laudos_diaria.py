@@ -37,13 +37,24 @@ import pandas as pd
 
 # Widgets para parametrização
 dbutils.widgets.text("data_processamento", "", "Data Processamento (YYYY-MM-DD)")
-dbutils.widgets.dropdown("modo_execucao", "job_diario", ["job_diario", "reprocessamento"], "Modo Execução")
-dbutils.widgets.text("dias_retroativos", "1", "Dias Retroativos (reprocessamento)")
+dbutils.widgets.dropdown("modo_execucao", "job_diario", ["job_diario", "reprocessamento_historico"], "Modo Execução")
+dbutils.widgets.text("dias_retroativos", "1", "Dias Retroativos (reprocessamento_historico)")
 
 # Obter parâmetros
 data_param = dbutils.widgets.get("data_processamento")
 modo_execucao = dbutils.widgets.get("modo_execucao")
 dias_retroativos = int(dbutils.widgets.get("dias_retroativos"))
+
+# Validar modo_execucao contra tabela de domínio
+df_modos_validos = spark.sql("""
+    SELECT codigo 
+    FROM innovation_dev.gold.radiologia_laudos_modo_execucao 
+    WHERE ativo = TRUE
+""")
+modos_validos = [row.codigo for row in df_modos_validos.collect()]
+
+if modo_execucao not in modos_validos:
+    raise ValueError(f"❌ Modo de execução inválido: '{modo_execucao}'. Valores válidos: {modos_validos}")
 
 # Determinar data de processamento
 if data_param:

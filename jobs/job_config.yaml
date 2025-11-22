@@ -42,7 +42,7 @@ tasks:
       base_parameters:
         # Parâmetros padrão (podem ser sobrescritos em execuções manuais)
         data_processamento: ""  # Vazio = D-1 automático
-        modo_execucao: "incremental"
+        modo_execucao: "job_diario"
         dias_retroativos: "1"
     
     timeout_seconds: 7200  # 2 horas

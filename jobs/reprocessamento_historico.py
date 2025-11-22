@@ -59,6 +59,18 @@ data_fim = datetime.strptime(data_fim_param, '%Y-%m-%d').date()
 if data_inicio >= data_fim:
     raise ValueError("❌ data_inicio deve ser anterior a data_fim!")
 
+# Validar modo_execucao contra tabela de domínio
+modo_execucao = "reprocessamento_historico"
+df_modos_validos = spark.sql("""
+    SELECT codigo 
+    FROM innovation_dev.gold.radiologia_laudos_modo_execucao 
+    WHERE ativo = TRUE
+""")
+modos_validos = [row.codigo for row in df_modos_validos.collect()]
+
+if modo_execucao not in modos_validos:
+    raise ValueError(f"❌ Modo de execução inválido: '{modo_execucao}'. Valores válidos: {modos_validos}")
+
 # Calcular lotes
 total_dias = (data_fim - data_inicio).days
 num_lotes = (total_dias // dias_por_lote) + (1 if total_dias % dias_por_lote > 0 else 0)
