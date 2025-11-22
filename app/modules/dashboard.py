@@ -292,13 +292,22 @@ def renderizar_dashboard(conn):
     with col1:
         st.subheader("🔬 Top 10 Modalidades")
         
+        # Query sempre precisa de JOIN com modalidades
         query_modalidades = f"""
         SELECT 
             m.nome_modalidade,
-            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
-            COUNT(DISTINCT {alias_tabela}.cd_paciente) as pacientes_unicos
-        {from_clause}
-        {where_clause_completo}
+            COUNT(DISTINCT l.accession_number) as total_laudos,
+            COUNT(DISTINCT l.cd_paciente) as pacientes_unicos
+        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+            ON l.cd_procedimento = p.cd_procedimento
+        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+            ON p.id_modalidade = m.id_modalidade
+        {('LEFT JOIN innovation_dev.gold.radiologia_laudos_descricoes d ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)') if descricoes_selecionadas else ''}
+        WHERE {where_sql}
+          AND p.ativo = TRUE
+          AND m.ativo = TRUE
+          {filtros_adicionais_sql}
         GROUP BY m.nome_modalidade
         ORDER BY total_laudos DESC
         LIMIT 10
@@ -336,14 +345,23 @@ def renderizar_dashboard(conn):
     with col2:
         st.subheader("📊 Top 10 Procedimentos")
         
+        # Query sempre precisa de JOIN com procedimentos
         query_procedimentos = f"""
         SELECT 
             p.cd_procedimento,
             p.nm_procedimento,
-            COUNT(DISTINCT {alias_tabela}.accession_number) as total_laudos,
-            COUNT(DISTINCT {alias_tabela}.cd_paciente) as pacientes_unicos
-        {from_clause}
-        {where_clause_completo}
+            COUNT(DISTINCT l.accession_number) as total_laudos,
+            COUNT(DISTINCT l.cd_paciente) as pacientes_unicos
+        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+            ON l.cd_procedimento = p.cd_procedimento
+        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+            ON p.id_modalidade = m.id_modalidade
+        {('LEFT JOIN innovation_dev.gold.radiologia_laudos_descricoes d ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)') if descricoes_selecionadas else ''}
+        WHERE {where_sql}
+          AND p.ativo = TRUE
+          AND m.ativo = TRUE
+          {filtros_adicionais_sql}
         GROUP BY p.cd_procedimento, p.nm_procedimento
         ORDER BY total_laudos DESC
         LIMIT 10
@@ -496,15 +514,24 @@ def renderizar_dashboard(conn):
     with col1:
         st.subheader("📋 Detalhamento por Modalidade")
         
+        # Query sempre precisa de JOIN com modalidades
         query_detalhamento = f"""
         SELECT 
             m.nome_modalidade as Modalidade,
-            COUNT(DISTINCT {alias_tabela}.accession_number) as `Total Laudos`,
-            COUNT(DISTINCT {alias_tabela}.cd_paciente) as `Pacientes Únicos`,
-            COUNT(DISTINCT {alias_tabela}.cd_procedimento) as `Procedimentos Distintos`,
-            ROUND(COUNT(DISTINCT {alias_tabela}.accession_number) * 100.0 / SUM(COUNT(DISTINCT {alias_tabela}.accession_number)) OVER (), 2) as `% do Total`
-        {from_clause}
-        {where_clause_completo}
+            COUNT(DISTINCT l.accession_number) as `Total Laudos`,
+            COUNT(DISTINCT l.cd_paciente) as `Pacientes Únicos`,
+            COUNT(DISTINCT l.cd_procedimento) as `Procedimentos Distintos`,
+            ROUND(COUNT(DISTINCT l.accession_number) * 100.0 / SUM(COUNT(DISTINCT l.accession_number)) OVER (), 2) as `% do Total`
+        FROM innovation_dev.bronze.radiologia_laudos_extraidos l
+        INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
+            ON l.cd_procedimento = p.cd_procedimento
+        INNER JOIN innovation_dev.gold.radiologia_laudos_modalidades m
+            ON p.id_modalidade = m.id_modalidade
+        {('LEFT JOIN innovation_dev.gold.radiologia_laudos_descricoes d ON d.id_descricao IN (p.id_descricao_1, p.id_descricao_2, p.id_descricao_3, p.id_descricao_4, p.id_descricao_5, p.id_descricao_6, p.id_descricao_7)') if descricoes_selecionadas else ''}
+        WHERE {where_sql}
+          AND p.ativo = TRUE
+          AND m.ativo = TRUE
+          {filtros_adicionais_sql}
         GROUP BY m.nome_modalidade
         ORDER BY `Total Laudos` DESC
         """
