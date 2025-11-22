@@ -120,7 +120,7 @@ CREATE TABLE innovation_dev.bronze.radiologia_laudos_extraidos (
     tms_procedimento_realizado TIMESTAMP,  -- Data + hora completa
     fonte STRING,  -- Origem: HSP ou PSC
     ano_mes STRING,  -- Particionamento (YYYY-MM)
-    dt_carga TIMESTAMP,  -- Quando foi carregado
+    tms_carga TIMESTAMP,  -- Quando foi carregado
     modo_execucao STRING  -- Como foi carregado (job_diario/reprocessamento_historico)
 )
 PARTITIONED BY (ano_mes)
@@ -145,7 +145,7 @@ USING DELTA
 ### Colunas de Controle
 
 - `fonte`: Origem do laudo (`HSP` = Hospital, `PSC` = Pronto Socorro)
-- `dt_carga`: Timestamp da carga no Delta Lake (quando foi carregado)
+- `tms_carga`: Timestamp da carga no Delta Lake (quando foi carregado)
 - `modo_execucao`: Valores controlados por tabela de domínio (`job_diario` ou `reprocessamento_historico`)
 
 ### Tabela de Domínio: modo_execucao
@@ -256,7 +256,7 @@ LIMIT 1;
 
 -- Volume por dia de carga
 SELECT 
-    DATE(dt_carga) as dia_carga,
+    DATE(tms_carga) as dia_carga,
     modo_execucao,
     COUNT(*) as total_laudos,
     COUNT(DISTINCT accession_number) as laudos_unicos,
@@ -309,7 +309,7 @@ SELECT
 FROM innovation_dev.bronze.radiologia_laudos_extraidos l
 INNER JOIN innovation_dev.gold.radiologia_laudos_procedimentos p
     ON l.cd_procedimento = p.cd_procedimento
-WHERE l.dt_carga >= CURRENT_DATE - INTERVAL 30 DAYS
+WHERE l.tms_carga >= CURRENT_DATE - INTERVAL 30 DAYS
 GROUP BY p.nome_modalidade
 ORDER BY total_laudos DESC;
 
@@ -555,7 +555,7 @@ dias_retroativos: 1
 -- Ver dados extraídos (por dia de carga)
 SELECT * 
 FROM innovation_dev.bronze.radiologia_laudos_extraidos
-WHERE DATE(dt_carga) = '2025-11-18'
+WHERE DATE(tms_carga) = '2025-11-18'
 LIMIT 10;
 
 -- Ver métricas

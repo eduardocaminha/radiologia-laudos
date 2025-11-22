@@ -343,7 +343,7 @@ for i in range(num_lotes):
         df_laudos = df_laudos.dropDuplicates(['accession_number'])
         
         # Adicionar metadados
-        df_laudos_final = df_laudos.withColumn("dt_carga", current_timestamp()) \
+        df_laudos_final = df_laudos.withColumn("tms_carga", current_timestamp()) \
             .withColumn("modo_execucao", lit("reprocessamento_historico"))
         
         # Salvar no Delta Lake
@@ -453,8 +453,8 @@ if not modo_teste and lotes_processados > 0:
             MAX(tms_procedimento_realizado) as data_max
         FROM {TABLE_LAUDOS_BRONZE}
         WHERE modo_execucao = 'reprocessamento_historico'
-          AND DATE(dt_carga) >= '{data_inicio}'
-          AND DATE(dt_carga) < '{data_fim}'
+          AND DATE(tms_carga) >= '{data_inicio}'
+          AND DATE(tms_carga) < '{data_fim}'
         GROUP BY ano_mes
         ORDER BY ano_mes
     """)
@@ -467,8 +467,8 @@ if not modo_teste and lotes_processados > 0:
         SELECT accession_number, COUNT(*) as count
         FROM {TABLE_LAUDOS_BRONZE}
         WHERE modo_execucao = 'reprocessamento_historico'
-          AND DATE(dt_carga) >= '{data_inicio}'
-          AND DATE(dt_carga) < '{data_fim}'
+          AND DATE(tms_carga) >= '{data_inicio}'
+          AND DATE(tms_carga) < '{data_fim}'
         GROUP BY accession_number
         HAVING COUNT(*) > 1
     """)
