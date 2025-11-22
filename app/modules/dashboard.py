@@ -58,7 +58,10 @@ def renderizar_dashboard(conn):
     if dias_filtro:
         where_clauses.append(f"tms_procedimento_realizado >= CURRENT_DATE - INTERVAL {dias_filtro} DAYS")
     
-    where_clauses.append(f"fonte IN ({','.join([f\"'{f}\"' for f in fonte_selecionada])})")
+    # Construir IN clause para fontes
+    fontes_quoted = [f"'{f}'" for f in fonte_selecionada]
+    fontes_in = ','.join(fontes_quoted)
+    where_clauses.append(f"fonte IN ({fontes_in})")
     
     where_sql = " AND ".join(where_clauses)
     
