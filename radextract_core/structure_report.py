@@ -39,6 +39,7 @@ import langextract.data
 from . import prompt_instruction
 from . import prompt_lib
 from . import report_examples
+from . import databricks_provider
 
 
 class FrontendIntervalDict(TypedDict):
@@ -176,6 +177,7 @@ class RadiologyReportStructurer:
     model_id: str
     temperature: float
     examples: list[langextract.data.ExampleData]
+    model_config: Any | None
     _patches_initialized: bool
 
     def __init__(
@@ -183,6 +185,7 @@ class RadiologyReportStructurer:
         api_key: str | None = None,
         model_id: str = "gemini-2.5-flash",
         temperature: float = 0.0,
+        model_config: Any | None = None,
     ):
         """Initializes the RadiologyReportStructurer.
 
@@ -195,6 +198,7 @@ class RadiologyReportStructurer:
         self.model_id = model_id
         self.temperature = temperature
         self.examples = report_examples.get_examples_for_model()
+        self.model_config = model_config
         self._patches_initialized = False
 
     def _ensure_patches_initialized(self):
@@ -267,18 +271,26 @@ class RadiologyReportStructurer:
             TypeError: If invalid parameters are provided.
         """
         self._ensure_patches_initialized()
-        return lx.extract(
-            text_or_documents=report_text,
-            prompt_description=prompt_instruction.PROMPT_INSTRUCTION.split(
+        common_kwargs = {
+            "text_or_documents": report_text,
+            "prompt_description": prompt_instruction.PROMPT_INSTRUCTION.split(
                 "# Few-Shot Examples"
             )[0],
-            examples=self.examples,
+            "examples": self.examples,
+            "max_char_buffer": max_char_buffer,
+            "temperature": self.temperature,
+        }
+
+        if self.model_config is not None:
+            return lx.extract(
+                **common_kwargs,
+                config=self.model_config,
+            )
+
+        return lx.extract(
+            **common_kwargs,
             model_id=self.model_id,
             api_key=self.api_key,
-            max_char_buffer=max_char_buffer,
-            temperature=self.temperature,
-            # accept_match_lesser handled via monkey-patch
-            # (Resolver.align patched at import time)
         )
 
     def _build_response(
