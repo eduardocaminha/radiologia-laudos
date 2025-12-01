@@ -1,5 +1,5 @@
 # Databricks notebook source
-# MAGIC %pip install langextract
+# MAGIC %pip install langextract ftfy
 
 # COMMAND ----------
 from datetime import datetime
