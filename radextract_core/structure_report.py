@@ -279,6 +279,7 @@ class RadiologyReportStructurer:
             "examples": self.examples,
             "max_char_buffer": max_char_buffer,
             "temperature": self.temperature,
+            "resolver_params": {"suppress_parse_errors": True},
         }
 
         if self.model_config is not None:
