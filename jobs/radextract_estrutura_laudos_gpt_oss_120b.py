@@ -57,6 +57,15 @@ structurer = RadiologyReportStructurer(
 )
 
 
+# COMMAND ----------
+laudo_teste = ""
+
+if laudo_teste.strip():
+    texto_teste_clean = preprocess_report(laudo_teste)
+    resultado_teste = structurer.predict(texto_teste_clean)
+    display(resultado_teste)
+
+
 result_rows = []
 
 for row in pdf.itertuples(index=False):
