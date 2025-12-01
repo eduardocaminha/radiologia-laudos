@@ -36,9 +36,9 @@ from typing import Any, TypedDict
 import langextract as lx
 import langextract.data
 
-import prompt_instruction
-import prompt_lib
-import report_examples
+from . import prompt_instruction
+from . import prompt_lib
+from . import report_examples
 
 
 class FrontendIntervalDict(TypedDict):

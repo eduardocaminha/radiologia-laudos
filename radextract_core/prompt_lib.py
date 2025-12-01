@@ -11,7 +11,7 @@ from typing import Optional
 from langextract.data import ExampleData
 from langextract.data_lib import enum_asdict_factory
 
-from prompt_instruction import PROMPT_INSTRUCTION
+from .prompt_instruction import PROMPT_INSTRUCTION
 
 
 def clean_dict(obj):
