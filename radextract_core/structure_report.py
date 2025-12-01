@@ -35,6 +35,7 @@ from typing import Any, TypedDict
 
 import langextract as lx
 import langextract.data
+import langextract.exceptions as lx_exceptions
 
 from . import prompt_instruction
 from . import prompt_lib
@@ -246,7 +247,7 @@ class RadiologyReportStructurer:
         try:
             result = self._perform_langextract(report_text, max_char_buffer)
             return self._build_response(result, report_text)
-        except (ValueError, TypeError, AttributeError) as e:
+        except (ValueError, TypeError, AttributeError, lx_exceptions.LangExtractError, Exception) as e:
             return ResponseDict(
                 text=f"Error processing report: {str(e)}",
                 segments=[],
