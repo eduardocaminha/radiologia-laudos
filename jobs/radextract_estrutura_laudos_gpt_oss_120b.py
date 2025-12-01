@@ -1,3 +1,7 @@
+# Databricks notebook source
+# MAGIC %pip install langextract
+
+# COMMAND ----------
 from datetime import datetime
 import json
 
@@ -7,6 +11,7 @@ from radextract_core.structure_report import RadiologyReportStructurer
 from radextract_core.sanitize import preprocess_report
 
 
+# COMMAND ----------
 dbutils.widgets.text("data_inicio", "", "Data início (YYYY-MM-DD)")
 dbutils.widgets.text("data_fim", "", "Data fim (YYYY-MM-DD)")
 dbutils.widgets.text("limit_registros", "100", "Limite de laudos")
@@ -23,6 +28,7 @@ limit_registros = int(dbutils.widgets.get("limit_registros"))
 output_table = dbutils.widgets.get("output_table")
 
 
+# COMMAND ----------
 bronze_table = "innovation_dev.bronze.radiologia_laudos_extraidos"
 
 df = spark.table(bronze_table)
@@ -43,6 +49,7 @@ if limit_registros > 0:
 pdf = df.select("accession_number", "ds_laudo_medico").toPandas()
 
 
+# COMMAND ----------
 structurer = RadiologyReportStructurer(
     api_key=None,
     model_id="databricks-gpt-oss-120b",
